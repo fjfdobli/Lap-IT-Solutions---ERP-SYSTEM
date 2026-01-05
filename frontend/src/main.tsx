@@ -1,12 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
 import DesktopApp from './desktop/App'
-import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {window.electronEnv?.isElectron ? <DesktopApp /> : <App />}
+    {window.electronEnv?.isElectron && <DesktopApp />}
   </React.StrictMode>,
 )
 
