@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "start:web": "vite",
-    "start:electron": "START_ELECTRON=true vite",
+    "start:electron": "cross-env START_ELECTRON=true vite",
     "prebuild": "cd ../backend && npm run build",
     "build": "tsc && vite build && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
@@ -15,8 +15,8 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.14.2",
-    "react-hook-form": "^7.45.1"
+    "react-hook-form": "^7.45.1",
+    "react-router-dom": "^6.14.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.64",
@@ -24,6 +24,7 @@
     "@typescript-eslint/eslint-plugin": "^7.1.1",
     "@typescript-eslint/parser": "^7.1.1",
     "@vitejs/plugin-react": "^4.2.1",
+    "cross-env": "^7.0.3",
     "electron": "^39.2.7",
     "electron-builder": "^24.13.3",
     "eslint": "^8.57.0",
