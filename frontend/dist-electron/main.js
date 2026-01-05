@@ -47,6 +47,18 @@ function createWindow() {
   win.webContents.on("did-finish-load", () => {
     win?.webContents.send("main-process-message", (/* @__PURE__ */ new Date()).toLocaleString());
   });
+  try {
+    const ses = win.webContents.session;
+    ses.webRequest.onHeadersReceived({ urls: ["*://*/*"] }, (details, callback) => {
+      const headers = details.responseHeaders || {};
+      headers["Content-Security-Policy"] = [
+        "default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+      ];
+      callback({ responseHeaders: headers });
+    });
+  } catch (err) {
+    console.warn("Could not set CSP header injection:", err);
+  }
   if (VITE_DEV_SERVER_URL && process.env.START_ELECTRON === "true") {
     win.loadURL(VITE_DEV_SERVER_URL);
   } else {

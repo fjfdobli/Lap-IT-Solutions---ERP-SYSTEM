@@ -60,6 +60,24 @@ function createWindow() {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
+  // Inject a safer Content-Security-Policy into responses so the renderer
+  // does not trigger Electron's "Insecure Content-Security-Policy" warning.
+  // We avoid enabling 'unsafe-eval' here to keep the policy stricter.
+  try {
+    const ses = win.webContents.session
+    // Use a broad URL filter so dev server and packaged files are covered.
+    ses.webRequest.onHeadersReceived({ urls: ['*://*/*'] }, (details: any, callback: any) => {
+      const headers = details.responseHeaders || {}
+      headers['Content-Security-Policy'] = [
+        "default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'",
+      ]
+      callback({ responseHeaders: headers })
+    })
+  } catch (err) {
+    // If session modification fails, ignore — this is only a dev-time convenience.
+    console.warn('Could not set CSP header injection:', err)
+  }
+
   if (VITE_DEV_SERVER_URL && process.env.START_ELECTRON === 'true') {
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
