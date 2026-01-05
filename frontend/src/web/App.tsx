@@ -4,7 +4,6 @@ import InviteAccept from './pages/InviteAccept.tsx'
 import Users from './pages/Users.tsx'
 import Roles from './pages/Roles.tsx'
 import Devices from './pages/Devices.tsx'
-import PosClients from './pages/PosClients.tsx'
 import Audit from './pages/Audit.tsx'
 import Chat from './pages/Chat.tsx'
 import Health from './pages/Health.tsx'
@@ -25,7 +24,7 @@ export default function App() {
     <BrowserRouter>
       <div className="top-nav">
         <nav>
-          <Link to="/">Dashboard</Link> | <Link to="/users">Users</Link> | <Link to="/roles">Roles</Link> | <Link to="/pos-clients">POS</Link> | <Link to="/devices">Devices</Link> | <Link to="/audit">Audit</Link> | <Link to="/chat">Chat</Link> | <Link to="/health">Health</Link> | <Link to="/integrations">Integrations</Link> | <Link to="/settings">Settings</Link> | <Link to="/login">Login</Link> | <Link to="/invite">Accept Invite</Link>
+          <Link to="/">Dashboard</Link> | <Link to="/users">Users</Link> | <Link to="/roles">Roles</Link> | <Link to="/devices">Devices</Link> | <Link to="/audit">Audit</Link> | <Link to="/chat">Chat</Link> | <Link to="/health">Health</Link> | <Link to="/integrations">Integrations</Link> | <Link to="/settings">Settings</Link> | <Link to="/login">Login</Link> | <Link to="/invite">Accept Invite</Link>
         </nav>
       </div>
       <main>
@@ -36,7 +35,6 @@ export default function App() {
           <Route path="/users" element={<Users />} />
           <Route path="/roles" element={<Roles />} />
           <Route path="/devices" element={<Devices />} />
-          <Route path="/pos-clients" element={<PosClients />} />
           <Route path="/audit" element={<Audit />} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/health" element={<Health />} />

@@ -60,13 +60,17 @@ app.on("window-all-closed", () => {
   }
 });
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  if (process.env.START_ELECTRON === "true" && BrowserWindow.getAllWindows().length === 0) createWindow();
 });
 app.on("web-contents-created", (_event, contents) => {
   contents.setWindowOpenHandler(() => ({ action: "deny" }));
   contents.on("will-navigate", (e) => e.preventDefault());
 });
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  if (process.env.START_ELECTRON === "true") {
+    createWindow();
+  }
+});
 export {
   MAIN_DIST,
   RENDERER_DIST,

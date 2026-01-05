@@ -1,10 +1,32 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import App from './web/App'
 import DesktopApp from './desktop/App'
+
+try {
+  if (import.meta.env && import.meta.env.DEV) {
+    const originalWarn = console.warn.bind(console)
+    console.warn = (...args: unknown[]) => {
+      const first = args[0]
+      if (typeof first === 'string') {
+        if (
+          first.includes('React Router Future Flag Warning') ||
+          first.includes('v7_startTransition') ||
+          first.includes('v7_relativeSplatPath')
+        ) {
+          return
+        }
+      }
+      originalWarn(...args)
+    }
+  }
+} catch (e) {
+  // ignore if environment detection fails
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {window.electronEnv?.isElectron && <DesktopApp />}
+    {window.electronEnv?.isElectron ? <DesktopApp /> : <App />}
   </React.StrictMode>,
 )
 

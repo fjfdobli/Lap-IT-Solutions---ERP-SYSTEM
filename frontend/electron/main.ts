@@ -75,7 +75,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  if (process.env.START_ELECTRON === 'true' && BrowserWindow.getAllWindows().length === 0) createWindow()
 })
 
 app.on('web-contents-created', (_event, contents) => {
@@ -83,4 +83,10 @@ app.on('web-contents-created', (_event, contents) => {
   contents.on('will-navigate', e => e.preventDefault())
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  if (process.env.START_ELECTRON === 'true') {
+    createWindow()
+  } else {
+    // Intentionally silent when not running Electron during web dev.
+  }
+})
