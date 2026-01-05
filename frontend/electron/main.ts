@@ -60,7 +60,7 @@ function createWindow() {
     win?.webContents.send('main-process-message', (new Date).toLocaleString())
   })
 
-  if (VITE_DEV_SERVER_URL) {
+  if (VITE_DEV_SERVER_URL && process.env.START_ELECTRON === 'true') {
     win.loadURL(VITE_DEV_SERVER_URL)
   } else {
     win.loadFile(path.join(RENDERER_DIST, 'index.html'))

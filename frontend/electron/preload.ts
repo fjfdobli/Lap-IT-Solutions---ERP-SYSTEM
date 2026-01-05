@@ -19,3 +19,10 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
   },
 
 })
+
+// Expose a small flag so the renderer can detect it's running inside Electron.
+// This is used to render a desktop-specific root UI (e.g. a desktop login)
+// without affecting the web dev server behavior.
+contextBridge.exposeInMainWorld('electronEnv', {
+  isElectron: true,
+})
