@@ -1,4 +1,3 @@
-import React from 'react'
 import { HashRouter, Routes, Route, Link } from 'react-router-dom'
 import DesktopLogin from './pages/Login'
 
@@ -6,7 +5,7 @@ function DesktopHome() {
   return (
     <div style={{padding:24}}>
       <h1>ERP Desktop</h1>
-      <p>Welcome to the desktop app (mock).</p>
+      <p>Welcome to the desktop app.</p>
     </div>
   )
 }

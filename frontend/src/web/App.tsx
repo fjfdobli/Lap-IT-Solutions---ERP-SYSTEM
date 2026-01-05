@@ -1,17 +1,15 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
-import './App.css'
-
-import Login from './web/pages/Login'
-import InviteAccept from './web/pages/InviteAccept'
-import Users from './web/pages/Users'
-import Roles from './web/pages/Roles'
-import Devices from './web/pages/Devices'
-import PosClients from './web/pages/PosClients.tsx'
-import Audit from './web/pages/Audit'
-import Chat from './web/pages/Chat'
-import Health from './web/pages/Health'
-import Integrations from './web/pages/Integrations'
-import Settings from './web/pages/Settings'
+import Login from './pages/Login.tsx'
+import InviteAccept from './pages/InviteAccept.tsx'
+import Users from './pages/Users.tsx'
+import Roles from './pages/Roles.tsx'
+import Devices from './pages/Devices.tsx'
+import PosClients from './pages/PosClients.tsx'
+import Audit from './pages/Audit.tsx'
+import Chat from './pages/Chat.tsx'
+import Health from './pages/Health.tsx'
+import Integrations from './pages/Integrations.tsx'
+import Settings from './pages/Settings.tsx'
 
 function Dashboard() {
   return (
