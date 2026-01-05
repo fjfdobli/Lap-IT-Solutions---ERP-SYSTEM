@@ -1,5 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import { Provider } from 'react-redux'
+import { store } from './redux/store'
+import './index.css'
 import App from './web/App'
 import DesktopApp from './desktop/App'
 
@@ -26,7 +29,9 @@ try {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {window.electronEnv?.isElectron ? <DesktopApp /> : <App />}
+    <Provider store={store}>
+      {window.electronEnv?.isElectron ? <DesktopApp /> : <App />}
+    </Provider>
   </React.StrictMode>,
 )
 
