@@ -1,29 +1,25 @@
-import { HashRouter, Routes, Route, Link } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import DesktopLogin from './pages/Login'
-
-function DesktopHome() {
-  return (
-    <div style={{padding:24}}>
-      <h1>ERP Desktop</h1>
-      <p>Welcome to the desktop app.</p>
-    </div>
-  )
-}
+import Dashboard from './pages/Dashboard'
+import PurchaseOrder from './pages/PurchaseOrder'
+import Inventory from './pages/Inventory'
+import { DashboardLayout } from '@/components/desktop/dashboard-layout'
 
 export default function DesktopApp() {
   return (
     <HashRouter>
-      <div className="top-nav" style={{padding:8}}>
-        <nav>
-          <Link to="/">Home</Link> | <Link to="/login">Login</Link>
-        </nav>
-      </div>
-      <main>
-        <Routes>
-          <Route path="/" element={<DesktopHome />} />
-          <Route path="/login" element={<DesktopLogin />} />
-        </Routes>
-      </main>
+      <Routes>
+        <Route path="/login" element={<DesktopLogin />} />
+        <Route path="/desktop" element={<DashboardLayout />}>
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="purchase-order" element={<PurchaseOrder />} />
+          <Route path="inventory" element={<Inventory />} />
+          <Route index element={<Dashboard />} />
+        </Route>
+        <Route path="/" element={<DashboardLayout />}>
+          <Route index element={<Dashboard />} />
+        </Route>
+      </Routes>
     </HashRouter>
   )
 }

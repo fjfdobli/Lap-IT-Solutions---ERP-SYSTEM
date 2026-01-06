@@ -35,6 +35,11 @@ if (process.env.START_ELECTRON === 'true') {
 }
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   plugins: [
     react(),
     ...(process.env.START_ELECTRON === 'true' ? [
