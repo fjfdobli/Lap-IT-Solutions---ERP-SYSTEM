@@ -1,19 +1,14 @@
-// Store
-export { store, type RootState, type AppDispatch } from './store';
+export { store, type RootState, type AppDispatch } from './store'
+export { useAppDispatch, useAppSelector } from './hooks'
 
-// Hooks
-export { useAppDispatch, useAppSelector } from './hooks';
-
-// Auth Slice
 export {
   setCredentials,
   setLoading,
   setError,
   logout,
   updateUser,
-} from './slices/authSlice';
+} from './slices/authSlice'
 
-// UI Slice
 export {
   toggleSidebar,
   setSidebarOpen,
@@ -22,4 +17,4 @@ export {
   addNotification,
   removeNotification,
   clearNotifications,
-} from './slices/uiSlice';
+} from './slices/uiSlice'

@@ -1,18 +1,18 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit'
 
 interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
+  id: string
+  email: string
+  name: string
+  role: string
 }
 
 interface AuthState {
-  user: User | null;
-  token: string | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  error: string | null;
+  user: User | null
+  token: string | null
+  isAuthenticated: boolean
+  isLoading: boolean
+  error: string | null
 }
 
 const initialState: AuthState = {
@@ -21,7 +21,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: false,
   error: null,
-};
+}
 
 const authSlice = createSlice({
   name: 'auth',
@@ -31,33 +31,33 @@ const authSlice = createSlice({
       state,
       action: PayloadAction<{ user: User; token: string }>
     ) => {
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-      state.isAuthenticated = true;
-      state.error = null;
+      state.user = action.payload.user
+      state.token = action.payload.token
+      state.isAuthenticated = true
+      state.error = null
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
-      state.isLoading = action.payload;
+      state.isLoading = action.payload
     },
     setError: (state, action: PayloadAction<string | null>) => {
-      state.error = action.payload;
-      state.isLoading = false;
+      state.error = action.payload
+      state.isLoading = false
     },
     logout: (state) => {
-      state.user = null;
-      state.token = null;
-      state.isAuthenticated = false;
-      state.error = null;
+      state.user = null
+      state.token = null
+      state.isAuthenticated = false
+      state.error = null
     },
     updateUser: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
-        state.user = { ...state.user, ...action.payload };
+        state.user = { ...state.user, ...action.payload }
       }
     },
   },
-});
+})
 
 export const { setCredentials, setLoading, setError, logout, updateUser } =
-  authSlice.actions;
+  authSlice.actions
 
-export default authSlice.reducer;
+export default authSlice.reducer

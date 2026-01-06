@@ -84,5 +84,10 @@ export default defineConfig({
     })(),
     /* eslint-enable @typescript-eslint/no-explicit-any */
   ],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   logLevel: 'silent',
 })
