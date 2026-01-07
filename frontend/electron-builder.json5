@@ -1,9 +1,10 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "com.lapitsolutions.erp",
   "asar": true,
-  "productName": "YourAppName",
+  "productName": "Lap IT Solutions ERP",
+  "icon": "images/lap_it_no-bg",
   "directories": {
     "output": "release/${version}"
   },
@@ -27,6 +28,7 @@
         ]
       }
     ],
+    "icon": "images/lap_it_no-bg.png",
     "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
   },
   "nsis": {

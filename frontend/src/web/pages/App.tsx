@@ -1,23 +1,23 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from '@/lib/auth-context'
-import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute'
-import DashboardLayout from './layouts/DashboardLayout'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import Users from './pages/Users'
-import Roles from './pages/Roles'
-import Devices from './pages/Devices'
-import Health from './pages/Health'
-import Settings from './pages/Settings'
-import Audit from './pages/Audit'
-import Help from './pages/Help'
-import InviteAccept from './pages/InviteAccept'
+import { ProtectedRoute, PublicRoute } from '../components/ProtectedRoute'
+import DashboardLayout from '../layouts/DashboardLayout'
+import Login from './Login'
+import Dashboard from './Dashboard'
+import Users from './Users'
+import Roles from './Roles'
+import Devices from './Devices'
+import Health from './Health'
+import Settings from './Settings'
+import Audit from './Audit'
+import Help from './Help'
+import InviteAccept from './InviteAccept'
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>          {/* Public Routes */}
+        <Routes>        
           <Route element={<PublicRoute />}>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<InviteAccept />} />

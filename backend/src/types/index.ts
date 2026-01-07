@@ -60,6 +60,7 @@ export interface Invitation {
 }
 
 export interface JWTPayload {
+  id: string  // alias for userId for convenience
   userId: string
   email: string
   userType: UserType

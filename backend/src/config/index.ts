@@ -1,6 +1,15 @@
 import dotenv from 'dotenv'
 dotenv.config()
 
+const parseCorsOrigin = () => {
+  const envOrigin = process.env.CORS_ORIGIN
+  if (!envOrigin) return '*'
+  if (envOrigin.includes(',')) {
+    return envOrigin.split(',').map(o => o.trim())
+  }
+  return envOrigin
+}
+
 export const config = {
   port: Number(process.env.PORT || 3000),
   
@@ -16,7 +25,7 @@ export const config = {
   },
   
   cors: {
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: parseCorsOrigin(),
     credentials: true,
   },
 }

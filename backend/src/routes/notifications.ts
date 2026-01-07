@@ -31,12 +31,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       params.push(type)
     }
 
-    // Count total
     const countQuery = query.replace(/SELECT .* FROM/, 'SELECT COUNT(*) as total FROM')
     const [countResult] = await erpPool.query<RowDataPacket[]>(countQuery, params)
     const total = countResult[0]?.total || 0
-
-    // Pagination
     const pageNum = parseInt(page as string, 10)
     const limitNum = parseInt(limit as string, 10)
     const offset = (pageNum - 1) * limitNum
@@ -45,8 +42,6 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     params.push(limitNum, offset)
 
     const [notifications] = await erpPool.query<RowDataPacket[]>(query, params)
-
-    // Get unread count
     const [unreadResult] = await erpPool.query<RowDataPacket[]>(
       'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
       [userId]

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/use-auth'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -72,7 +72,6 @@ export default function Settings() {
   const [loginAlerts, setLoginAlerts] = useState(true)
   const [securityAlerts, setSecurityAlerts] = useState(true)
   const [systemUpdates, setSystemUpdates] = useState(false)
-    // Additional notification settings
   const [userActivityNotifications, setUserActivityNotifications] = useState(true)
   const [deviceNotifications, setDeviceNotifications] = useState(true)
   const [roleChangeNotifications, setRoleChangeNotifications] = useState(true)

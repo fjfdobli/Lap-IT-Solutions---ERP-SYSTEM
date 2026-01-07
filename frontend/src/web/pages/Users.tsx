@@ -218,7 +218,7 @@ export default function Users() {
         firstName: createFirstName,
         lastName: createLastName,
         password: createPassword,
-        userType: createUserType, // admin or manager only
+        userType: createUserType,
         isActive: createStatus === 'active',
         roleIds: createRoleIds.length > 0 ? createRoleIds : undefined,
       })
@@ -724,7 +724,6 @@ export default function Users() {
             </Card>
           </div>
 
-          {/* Action Button */}
           <div className="flex justify-end">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -746,7 +745,6 @@ export default function Users() {
             </DropdownMenu>
           </div>
 
-          {/* Filters & Search */}
           <Card>
             <CardContent className="p-4">
               <div className="flex flex-col md:flex-row gap-4">
@@ -786,13 +784,10 @@ export default function Users() {
             </CardContent>
           </Card>
 
-          {/* Users Table */}
           {renderUserTable(filteredDesktopUsers)}
         </TabsContent>
 
-        {/* Super Admins Tab */}
         <TabsContent value="superadmin" className="space-y-6">
-          {/* Info Card */}
           <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
@@ -805,7 +800,6 @@ export default function Users() {
             </CardHeader>
           </Card>
 
-          {/* Stats Cards */}
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardContent className="p-4">
@@ -848,7 +842,6 @@ export default function Users() {
             </Card>
           </div>
 
-          {/* Action Button */}
           <div className="flex justify-end">
             <Button onClick={() => setShowCreateSuperAdminDialog(true)} className="bg-purple-600 hover:bg-purple-700">
               <Plus className="h-4 w-4 mr-2" />
@@ -856,7 +849,6 @@ export default function Users() {
             </Button>
           </div>
 
-          {/* Search */}
           <Card>
             <CardContent className="p-4">
               <div className="flex flex-col md:flex-row gap-4">
@@ -883,12 +875,10 @@ export default function Users() {
             </CardContent>
           </Card>
 
-          {/* Users Table */}
           {renderUserTable(filteredSuperAdminUsers)}
         </TabsContent>
       </Tabs>
 
-      {/* Invite User Dialog (Desktop Only) */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -997,7 +987,6 @@ export default function Users() {
         </DialogContent>
       </Dialog>
 
-      {/* Create Desktop User Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1145,7 +1134,6 @@ export default function Users() {
         </DialogContent>
       </Dialog>
 
-      {/* Create Super Admin Dialog */}
       <Dialog open={showCreateSuperAdminDialog} onOpenChange={setShowCreateSuperAdminDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1263,7 +1251,6 @@ export default function Users() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1284,7 +1271,6 @@ export default function Users() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit User Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1381,7 +1367,6 @@ export default function Users() {
         </DialogContent>
       </Dialog>
 
-      {/* Reset Password Dialog */}
       <Dialog open={showResetPasswordDialog} onOpenChange={setShowResetPasswordDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1448,7 +1433,6 @@ export default function Users() {
         </DialogContent>
       </Dialog>
 
-      {/* Manage Roles Dialog */}
       <Dialog open={showManageRolesDialog} onOpenChange={setShowManageRolesDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

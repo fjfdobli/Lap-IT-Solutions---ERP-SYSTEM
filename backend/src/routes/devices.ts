@@ -4,12 +4,12 @@ import { erpPool } from '../database/database'
 import { authenticateToken, requireSuperAdmin } from '../middleware/auth'
 import { AuthRequest } from '../types'
 import { RowDataPacket, ResultSetHeader } from 'mysql2'
+import { notifyDeviceActivity } from '../utils/notifications'
 
 const router = Router()
 
 router.use(authenticateToken)
 
-// Get all devices
 router.get('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { status, search, page = '1', limit = '50' } = req.query
@@ -25,7 +25,6 @@ router.get('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
     const params: any[] = []
 
     if (status === 'online') {
-      // Consider online if last seen within 5 minutes
       query += ' AND d.last_seen > DATE_SUB(NOW(), INTERVAL 5 MINUTE) AND d.is_active = TRUE'
     } else if (status === 'offline') {
       query += ' AND (d.last_seen IS NULL OR d.last_seen <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)) AND d.is_active = TRUE'
@@ -39,12 +38,9 @@ router.get('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
       params.push(searchPattern, searchPattern)
     }
 
-    // Count total
     const countQuery = query.replace(/SELECT .* FROM/, 'SELECT COUNT(*) as total FROM')
     const [countResult] = await erpPool.query<RowDataPacket[]>(countQuery, params)
     const total = countResult[0]?.total || 0
-
-    // Pagination
     const pageNum = parseInt(page as string, 10)
     const limitNum = parseInt(limit as string, 10)
     const offset = (pageNum - 1) * limitNum
@@ -53,8 +49,6 @@ router.get('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
     params.push(limitNum, offset)
 
     const [devices] = await erpPool.query<RowDataPacket[]>(query, params)
-
-    // Determine status for each device
     const now = new Date()
     const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000)
 
@@ -75,9 +69,9 @@ router.get('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
             deviceId: d.device_key,
             status: deviceStatus,
             lastSeen: d.last_seen,
-            ipAddress: null, // Would come from session data
-            osVersion: null, // Would come from device registration
-            appVersion: null, // Would come from device registration
+            ipAddress: null, 
+            osVersion: null, 
+            appVersion: null, 
             createdAt: d.registered_at,
             updatedAt: d.registered_at,
             userId: d.user_id,
@@ -98,7 +92,6 @@ router.get('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Get single device
 router.get('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
@@ -150,13 +143,10 @@ router.get('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response) =>
   }
 })
 
-// Update device
 router.put('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
     const { deviceName, status } = req.body
-
-    // Check if device exists
     const [devices] = await erpPool.query<RowDataPacket[]>(
       'SELECT * FROM devices WHERE id = ?',
       [id]
@@ -191,7 +181,6 @@ router.put('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response) =>
       params
     )
 
-    // Log audit
     await erpPool.query(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, created_at)
        VALUES (?, ?, 'update', 'device', ?, NOW())`,
@@ -205,7 +194,6 @@ router.put('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response) =>
   }
 })
 
-// Delete device
 router.delete('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
@@ -220,18 +208,183 @@ router.delete('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response)
       return
     }
 
+    const deviceName = devices[0]?.device_name || 'Unknown Device'
+
     await erpPool.query('DELETE FROM devices WHERE id = ?', [id])
 
-    // Log audit
     await erpPool.query(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, old_values, created_at)
        VALUES (?, ?, 'delete', 'device', ?, ?, NOW())`,
       [uuidv4(), req.user!.userId, id, JSON.stringify(devices[0])]
     )
 
+    // Notify admins about device removal
+    await notifyDeviceActivity(req.user!.userId, 'removed', deviceName)
+
     res.json({ success: true, message: 'Device removed successfully' })
   } catch (err) {
     console.error('Delete device error:', err)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Device registration (for desktop app login)
+router.post('/register', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId
+    const { deviceName, deviceKey } = req.body
+
+    if (!deviceName || !deviceKey) {
+      res.status(400).json({ success: false, error: 'Device name and key are required' })
+      return
+    }
+
+    // Check if device already exists
+    const [existing] = await erpPool.query<RowDataPacket[]>(
+      'SELECT * FROM devices WHERE device_key = ?',
+      [deviceKey]
+    )
+
+    if (existing.length > 0) {
+      // Check if device is disabled - don't allow registration
+      const existingDevice = existing[0]!
+      if (!existingDevice.is_active) {
+        // Return 200 with success: false to avoid console errors on client
+        res.json({
+          success: false,
+          error: 'This device has been disabled by the Super Admin. Please contact your administrator to re-enable access.',
+          code: 'DEVICE_DISABLED'
+        })
+        return
+      }
+      
+      // Update existing device (keep is_active unchanged)
+      await erpPool.query(
+        `UPDATE devices SET user_id = ?, device_name = ?, last_seen = NOW() WHERE device_key = ?`,
+        [userId, deviceName, deviceKey]
+      )
+
+      res.json({
+        success: true,
+        data: {
+          id: existingDevice.id,
+          deviceName,
+          deviceKey,
+          isNew: false,
+        }
+      })
+    } else {
+      const id = uuidv4()
+      await erpPool.query(
+        `INSERT INTO devices (id, user_id, device_name, device_key, last_seen, is_active, registered_at)
+         VALUES (?, ?, ?, ?, NOW(), TRUE, NOW())`,
+        [id, userId, deviceName, deviceKey]
+      )
+
+      await notifyDeviceActivity(userId, 'registered', deviceName)
+
+      res.status(201).json({
+        success: true,
+        data: {
+          id,
+          deviceName,
+          deviceKey,
+          isNew: true,
+        }
+      })
+    }
+  } catch (err) {
+    console.error('Register device error:', err)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Device heartbeat (to keep device online)
+router.post('/heartbeat', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId
+    const { deviceKey } = req.body
+
+    if (!deviceKey) {
+      res.status(400).json({ success: false, error: 'Device key is required' })
+      return
+    }
+
+    // Check if device exists and is active
+    const [devices] = await erpPool.query<RowDataPacket[]>(
+      `SELECT id, device_name, is_active FROM devices WHERE device_key = ?`,
+      [deviceKey]
+    )
+
+    if (devices.length === 0) {
+      res.status(404).json({ success: false, error: 'Device not found', code: 'DEVICE_NOT_FOUND' })
+      return
+    }
+
+    const device = devices[0]!
+
+    if (!device.is_active) {
+      res.status(403).json({ 
+        success: false, 
+        error: 'Device has been disabled by administrator', 
+        code: 'DEVICE_DISABLED' 
+      })
+      return
+    }
+
+    // Update last seen
+    await erpPool.query(
+      `UPDATE devices SET last_seen = NOW(), user_id = ? WHERE device_key = ?`,
+      [userId, deviceKey]
+    )
+
+    res.json({ 
+      success: true, 
+      message: 'Heartbeat received',
+      data: {
+        deviceId: device.id,
+        deviceName: device.device_name,
+        isActive: true
+      }
+    })
+  } catch (err) {
+    console.error('Heartbeat error:', err)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Check device status (for desktop app to verify if still allowed)
+router.get('/status/:deviceKey', async (req: AuthRequest, res: Response) => {
+  try {
+    const { deviceKey } = req.params
+
+    const [devices] = await erpPool.query<RowDataPacket[]>(
+      `SELECT id, device_name, is_active, last_seen FROM devices WHERE device_key = ?`,
+      [deviceKey]
+    )
+
+    if (devices.length === 0) {
+      res.status(404).json({ 
+        success: false, 
+        error: 'Device not registered', 
+        code: 'DEVICE_NOT_FOUND' 
+      })
+      return
+    }
+
+    const device = devices[0]!
+
+    res.json({
+      success: true,
+      data: {
+        deviceId: device.id,
+        deviceName: device.device_name,
+        isActive: device.is_active,
+        lastSeen: device.last_seen
+      }
+    })
+  } catch (err) {
+    console.error('Device status error:', err)
     res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })

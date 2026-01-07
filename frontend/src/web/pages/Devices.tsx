@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
   Card,
@@ -63,6 +64,9 @@ import {
   Info,
   CheckCircle2,
   XCircle,
+  User,
+  UserCheck,
+  UserX,
 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -78,6 +82,8 @@ interface Device {
   appVersion: string | null
   createdAt: string
   updatedAt: string
+  userId: string | null
+  userName: string | null
 }
 
 export default function Devices() {
@@ -90,6 +96,9 @@ export default function Devices() {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
+  const [showConfigureDialog, setShowConfigureDialog] = useState(false)
+  const [editDeviceName, setEditDeviceName] = useState('')
+  const [isUpdating, setIsUpdating] = useState(false)
 
   const loadDevices = useCallback(async () => {
     setIsLoading(true)
@@ -107,7 +116,8 @@ export default function Devices() {
 
   useEffect(() => {
     loadDevices()
-    const interval = setInterval(loadDevices, 30000)
+    // Poll every 10 seconds for real-time device status
+    const interval = setInterval(loadDevices, 10000)
     return () => clearInterval(interval)
   }, [loadDevices])
 
@@ -137,6 +147,29 @@ export default function Devices() {
     }
   }
 
+  function openConfigureDialog(device: Device) {
+    setSelectedDevice(device)
+    setEditDeviceName(device.deviceName)
+    setShowConfigureDialog(true)
+  }
+
+  async function handleConfigureDevice() {
+    if (!selectedDevice || !editDeviceName.trim()) return
+    setIsUpdating(true)
+
+    try {
+      await api.updateDevice(selectedDevice.id, { deviceName: editDeviceName.trim() })
+      setShowConfigureDialog(false)
+      setSelectedDevice(null)
+      setEditDeviceName('')
+      loadDevices()
+    } catch (error) {
+      console.error('Failed to update device:', error)
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
   const filteredDevices = devices.filter(device => {
     const matchesSearch = device.deviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          device.deviceId.toLowerCase().includes(searchQuery.toLowerCase())
@@ -152,6 +185,8 @@ export default function Devices() {
     online: devices.filter(d => d.status === 'online').length,
     offline: devices.filter(d => d.status === 'offline').length,
     disabled: devices.filter(d => d.status === 'disabled').length,
+    activeUsers: devices.filter(d => d.status === 'online' && d.userName).length,
+    unassigned: devices.filter(d => !d.userName).length,
   }
 
   function handleExportDevices() {
@@ -234,8 +269,7 @@ export default function Devices() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
@@ -288,9 +322,21 @@ export default function Devices() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <UserCheck className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.activeUsers}</p>
+                <p className="text-sm text-muted-foreground">Active Users</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Filters & Search */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
@@ -330,7 +376,6 @@ export default function Devices() {
         </CardContent>
       </Card>
 
-      {/* Devices Content */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -398,7 +443,7 @@ export default function Devices() {
                         <Info className="h-4 w-4 mr-2" />
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openConfigureDialog(device)}>
                         <Settings className="h-4 w-4 mr-2" />
                         Configure
                       </DropdownMenuItem>
@@ -440,6 +485,38 @@ export default function Devices() {
                   )}
                 </div>
 
+                {/* User Information */}
+                <div className={cn(
+                  "flex items-center gap-2 p-2 rounded-lg",
+                  device.status === 'online' && device.userName
+                    ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900"
+                    : device.userName 
+                      ? "bg-muted/50"
+                      : "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900"
+                )}>
+                  {device.status === 'online' && device.userName ? (
+                    <UserCheck className="h-4 w-4 text-green-600" />
+                  ) : device.userName ? (
+                    <User className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <UserX className="h-4 w-4 text-orange-600" />
+                  )}
+                  <span className={cn(
+                    "text-sm font-medium",
+                    device.status === 'online' && device.userName
+                      ? "text-green-700 dark:text-green-400"
+                      : device.userName
+                        ? "text-foreground"
+                        : "text-orange-700 dark:text-orange-400"
+                  )}>
+                    {device.status === 'online' && device.userName
+                      ? `${device.userName} (Active)`
+                      : device.userName 
+                        ? device.userName
+                        : 'Unassigned'}
+                  </span>
+                </div>
+
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Clock className="h-4 w-4" />
@@ -469,6 +546,7 @@ export default function Devices() {
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
                   <TableHead>Device</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>User</TableHead>
                   <TableHead>Last Seen</TableHead>
                   <TableHead>IP Address</TableHead>
                   <TableHead>Created</TableHead>
@@ -495,6 +573,36 @@ export default function Devices() {
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(device)}</TableCell>
+                    <TableCell>
+                      <div className={cn(
+                        "flex items-center gap-2 px-2 py-1 rounded-md w-fit",
+                        device.status === 'online' && device.userName
+                          ? "bg-green-100 dark:bg-green-950/50"
+                          : device.userName
+                            ? "bg-muted"
+                            : "bg-orange-100 dark:bg-orange-950/50"
+                      )}>
+                        {device.status === 'online' && device.userName ? (
+                          <UserCheck className="h-3.5 w-3.5 text-green-600" />
+                        ) : device.userName ? (
+                          <User className="h-3.5 w-3.5 text-muted-foreground" />
+                        ) : (
+                          <UserX className="h-3.5 w-3.5 text-orange-600" />
+                        )}
+                        <span className={cn(
+                          "text-sm",
+                          device.status === 'online' && device.userName
+                            ? "text-green-700 dark:text-green-400 font-medium"
+                            : device.userName
+                              ? "text-foreground"
+                              : "text-orange-700 dark:text-orange-400"
+                        )}>
+                          {device.status === 'online' && device.userName
+                            ? `${device.userName} ●`
+                            : device.userName || 'Unassigned'}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {device.lastSeen 
                         ? formatDistanceToNow(new Date(device.lastSeen), { addSuffix: true })
@@ -527,6 +635,10 @@ export default function Devices() {
                           }}>
                             <Info className="h-4 w-4 mr-2" />
                             View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openConfigureDialog(device)}>
+                            <Settings className="h-4 w-4 mr-2" />
+                            Configure
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleToggleDeviceStatus(device)}>
                             {device.status !== 'disabled' ? (
@@ -563,7 +675,6 @@ export default function Devices() {
         </Card>
       )}
 
-      {/* Device Registration Info */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -589,7 +700,6 @@ export default function Devices() {
         </CardContent>
       </Card>
 
-      {/* Device Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -706,7 +816,38 @@ export default function Devices() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Configure Device Dialog */}
+      <Dialog open={showConfigureDialog} onOpenChange={setShowConfigureDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Configure Device</DialogTitle>
+            <DialogDescription>
+              Update the device name for "{selectedDevice?.deviceName}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="deviceName">Device Name</Label>
+              <Input
+                id="deviceName"
+                value={editDeviceName}
+                onChange={(e) => setEditDeviceName(e.target.value)}
+                placeholder="Enter device name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConfigureDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfigureDevice} disabled={isUpdating || !editDeviceName.trim()}>
+              {isUpdating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

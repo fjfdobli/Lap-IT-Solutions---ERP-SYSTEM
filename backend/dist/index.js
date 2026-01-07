@@ -13,6 +13,16 @@ const users_1 = __importDefault(require("./routes/users"));
 const roles_1 = __importDefault(require("./routes/roles"));
 const permissions_1 = __importDefault(require("./routes/permissions"));
 const health_1 = __importDefault(require("./routes/health"));
+const devices_1 = __importDefault(require("./routes/devices"));
+const audit_1 = __importDefault(require("./routes/audit"));
+const notifications_1 = __importDefault(require("./routes/notifications"));
+const settings_1 = __importDefault(require("./routes/settings"));
+const dashboard_1 = __importDefault(require("./routes/dashboard"));
+const suppliers_1 = __importDefault(require("./routes/suppliers"));
+const products_1 = __importDefault(require("./routes/products"));
+const inventory_1 = __importDefault(require("./routes/inventory"));
+const purchase_orders_1 = __importDefault(require("./routes/purchase-orders"));
+const pos_data_1 = __importDefault(require("./routes/pos-data"));
 const app = (0, express_1.default)();
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)(config_1.config.cors));
@@ -28,6 +38,16 @@ app.get('/', (req, res) => {
             roles: '/api/roles',
             permissions: '/api/permissions',
             health: '/api/health',
+            devices: '/api/devices',
+            audit: '/api/audit',
+            notifications: '/api/notifications',
+            settings: '/api/settings',
+            dashboard: '/api/dashboard',
+            suppliers: '/api/suppliers',
+            products: '/api/products',
+            inventory: '/api/inventory',
+            purchaseOrders: '/api/purchase-orders',
+            posData: '/api/pos-data',
         }
     });
 });
@@ -36,6 +56,16 @@ app.use('/api/users', users_1.default);
 app.use('/api/roles', roles_1.default);
 app.use('/api/permissions', permissions_1.default);
 app.use('/api/health', health_1.default);
+app.use('/api/devices', devices_1.default);
+app.use('/api/audit', audit_1.default);
+app.use('/api/notifications', notifications_1.default);
+app.use('/api/settings', settings_1.default);
+app.use('/api/dashboard', dashboard_1.default);
+app.use('/api/suppliers', suppliers_1.default);
+app.use('/api/products', products_1.default);
+app.use('/api/inventory', inventory_1.default);
+app.use('/api/purchase-orders', purchase_orders_1.default);
+app.use('/api/pos-data', pos_data_1.default);
 app.get('/db-status', async (_req, res) => {
     const results = await (0, database_1.testConnections)();
     res.json({ databases: results });

@@ -143,7 +143,6 @@ router.post('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
       )
     }
 
-    // Send notification for new role creation
     await notifyRoleChange(req.user!.userId, 'created', name)
 
     res.status(201).json({
@@ -226,7 +225,6 @@ router.put('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response) =>
       }
     }
 
-    // Send notification for role update
     const [roleInfo] = await erpPool.query<RowDataPacket[]>(
       'SELECT name FROM roles WHERE id = ?',
       [id]
@@ -263,8 +261,6 @@ router.delete('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response)
     }
 
     await erpPool.query('DELETE FROM roles WHERE id = ?', [id])
-
-    // Send notification for role deletion
     await notifyRoleChange(req.user!.userId, 'deleted', role.name)
 
     res.json({ success: true, message: 'Role deleted successfully' })

@@ -9,7 +9,6 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2'
 import { notifyUserActivity, notifyRoleChange } from '../utils/notifications'
 
 const router = Router()
-
 router.use(authenticateToken)
 
 router.get('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
@@ -45,7 +44,6 @@ router.get('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
     const countQuery = query.replace(/SELECT .* FROM/, 'SELECT COUNT(*) as total FROM')
     const [countResult] = await erpPool.query<RowDataPacket[]>(countQuery, params)
     const total = countResult[0]!.total
-
     const pageNum = parseInt(page as string, 10)
     const limitNum = parseInt(limit as string, 10)
     const offset = (pageNum - 1) * limitNum
@@ -183,7 +181,6 @@ router.post('/', requireSuperAdmin, async (req: AuthRequest, res: Response) => {
       )
     }
 
-    // Send notification for new user creation
     await notifyUserActivity(
       req.user!.userId,
       'created',
@@ -268,7 +265,6 @@ router.put('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response) =>
           [roleValues]
         )
         
-        // Get role names for notification
         const [roles] = await erpPool.query<RowDataPacket[]>(
           'SELECT name FROM roles WHERE id IN (?)',
           [roleIds]
@@ -284,7 +280,6 @@ router.put('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response) =>
       }
     }
 
-    // Send notification for user update
     const userName = firstName || existingUser.first_name
     const userLastName = lastName || existingUser.last_name
     
@@ -320,7 +315,6 @@ router.delete('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response)
       return
     }
 
-    // Get user info before deletion for notification
     const [userInfo] = await erpPool.query<RowDataPacket[]>(
       'SELECT first_name, last_name, user_type FROM users WHERE id = ?',
       [id]
@@ -336,7 +330,6 @@ router.delete('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response)
       return
     }
 
-    // Send notification for user deletion
     if (userInfo.length > 0) {
       const user = userInfo[0]!
       await notifyUserActivity(

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -120,7 +120,7 @@ export default function Roles() {
   const [viewingRole, setViewingRole] = useState<Role | null>(null)
   const [viewingPermissions, setViewingPermissions] = useState<string[]>([])
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setIsLoading(true)
     try {
       const [rolesRes, permsRes] = await Promise.all([
@@ -140,11 +140,14 @@ export default function Roles() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadData()
-  }, [])
+    // Auto-refresh every 30 seconds for real-time user counts
+    const interval = setInterval(loadData, 30000)
+    return () => clearInterval(interval)
+  }, [loadData])
 
   async function handleCreateRole() {
     if (!createName) {
@@ -284,6 +287,7 @@ export default function Roles() {
     total: roles.length,
     system: roles.filter(r => r.isSystemRole).length,
     custom: roles.filter(r => !r.isSystemRole).length,
+    totalUsers: roles.reduce((sum, r) => sum + r.userCount, 0),
   }
 
   const totalPermissions = Object.values(groupedPermissions).flat().length
@@ -409,8 +413,7 @@ export default function Roles() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
@@ -453,6 +456,19 @@ export default function Roles() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-4">
+              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Users className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.totalUsers}</p>
+                <p className="text-sm text-muted-foreground">Assigned Users</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-4">
               <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
                 <KeyRound className="h-5 w-5 text-purple-600" />
               </div>
@@ -465,7 +481,6 @@ export default function Roles() {
         </Card>
       </div>
 
-      {/* Search */}
       <Card>
         <CardContent className="p-4">
           <div className="relative">
@@ -480,7 +495,6 @@ export default function Roles() {
         </CardContent>
       </Card>
 
-      {/* Roles Grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -659,7 +673,6 @@ export default function Roles() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Role Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -735,7 +748,6 @@ export default function Roles() {
         </DialogContent>
       </Dialog>
 
-      {/* View Permissions Dialog */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -774,7 +786,6 @@ export default function Roles() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

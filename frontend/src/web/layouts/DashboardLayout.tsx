@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-dom'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/use-auth'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -423,7 +423,6 @@ export default function DashboardLayout() {
                       } else if (location.pathname.includes('/devices')) {
                         // Already on devices page
                       } else {
-                        // Navigate to users by default for global search
                         navigate(`/users?search=${encodeURIComponent(searchQuery)}`)
                       }
                     }

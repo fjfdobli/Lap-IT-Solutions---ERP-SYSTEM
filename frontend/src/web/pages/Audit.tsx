@@ -129,7 +129,6 @@ export default function Audit() {
   const loadAuditLogs = useCallback(async () => {
     setIsLoading(true)
     try {
-      // Calculate date range
       const endDate = new Date().toISOString()
       const startDate = new Date()
       startDate.setDate(startDate.getDate() - parseInt(filters.dateRange))
@@ -232,7 +231,6 @@ export default function Audit() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Audit Logs</h1>
@@ -252,7 +250,6 @@ export default function Audit() {
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="p-4">
@@ -308,7 +305,6 @@ export default function Audit() {
         </Card>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
@@ -377,7 +373,6 @@ export default function Audit() {
         </CardContent>
       </Card>
 
-      {/* Audit Logs Table */}
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
@@ -529,7 +524,6 @@ export default function Audit() {
         )}
       </Card>
 
-      {/* Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
@@ -543,7 +537,6 @@ export default function Audit() {
           </DialogHeader>
           {selectedLog && (
             <div className="space-y-6">
-              {/* Summary */}
               <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
                 <Avatar className="h-12 w-12">
                   <AvatarFallback className="bg-primary/10 text-primary">
@@ -559,7 +552,6 @@ export default function Audit() {
                 </Badge>
               </div>
 
-              {/* Details Grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Timestamp</p>
@@ -581,7 +573,6 @@ export default function Audit() {
                 </div>
               </div>
 
-              {/* Changes */}
               {(selectedLog.oldValues || selectedLog.newValues) && (
                 <div className="space-y-3">
                   <p className="text-sm font-semibold">Changes</p>
@@ -612,7 +603,6 @@ export default function Audit() {
                 </div>
               )}
 
-              {/* User Agent */}
               {selectedLog.userAgent && (
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground">User Agent</p>

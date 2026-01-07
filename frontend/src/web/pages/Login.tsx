@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,11 +16,9 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-
   const { login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-
   const from = location.state?.from?.pathname || '/'
 
   async function handleSubmit(e: React.FormEvent) {
@@ -44,18 +42,14 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-sidebar relative overflow-hidden">
-        {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
           }} />
         </div>
 
-        {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 text-white w-full">
-          {/* Logo */}
           <div className="flex items-center gap-4">
             <img 
               src="/images/lap_it_no-bg.png" 
@@ -63,12 +57,11 @@ export default function Login() {
               className="h-14 w-14 object-contain"
             />
             <div>
-              <h1 className="text-2xl font-bold text-white">Lap IT Solutions</h1>
-              <p className="text-white/60 text-sm">Enterprise Resource Planning</p>
+              <h1 className="text-2xl font-bold text-white">Lap IT Solutions Inc.</h1>
+              <p className="text-white/60 text-sm">Enterprise Resource Planning | Control Center</p>
             </div>
           </div>
 
-          {/* Main Content */}
           <div className="space-y-8">
             <div>
               <h2 className="text-4xl font-bold mb-4 text-white">
@@ -79,7 +72,6 @@ export default function Login() {
               </p>
             </div>
 
-            {/* Features */}
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 rounded-lg bg-white/10 flex items-center justify-center">
@@ -102,17 +94,14 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Footer */}
           <div className="text-white/50 text-sm">
             <p>© 2026 Lap IT Solutions Inc. All rights reserved.</p>
           </div>
         </div>
       </div>
 
-      {/* Right Panel - Login Form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-8">
-          {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
             <img 
               src="/images/lap_it_no-bg.png" 
@@ -125,7 +114,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Header */}
           <div className="text-center lg:text-left">
             <h2 className="text-3xl font-bold tracking-tight">Welcome back</h2>
             <p className="text-muted-foreground mt-2">
@@ -133,7 +121,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <Alert variant="destructive" className="animate-slide-down">
@@ -143,7 +130,6 @@ export default function Login() {
             )}
 
             <div className="space-y-4">
-              {/* Email Field */}
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-medium">
                   Email Address
@@ -153,7 +139,7 @@ export default function Login() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="admin@lapitsolutions.com"
+                    placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -166,7 +152,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Password Field */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password" className="text-sm font-medium">
@@ -210,7 +195,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Remember Me */}
               <div className="flex items-center space-x-2">
                 <Checkbox 
                   id="remember" 
@@ -226,7 +210,6 @@ export default function Login() {
               </div>
             </div>
 
-            {/* Submit Button */}
             <Button 
               type="submit" 
               className="w-full h-11 text-base font-medium" 
@@ -243,7 +226,6 @@ export default function Login() {
             </Button>
           </form>
 
-          {/* Footer */}
           <div className="text-center space-y-4">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
@@ -262,7 +244,6 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Security Badge */}
           <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
             <Lock className="h-3 w-3" />
             <span>Secured with 256-bit SSL encryption</span>

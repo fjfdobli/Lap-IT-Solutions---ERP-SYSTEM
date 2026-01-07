@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,8 @@ import {
   Globe,
   Shield,
   Timer,
+  Monitor,
+  Chrome,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -57,16 +59,102 @@ interface SystemMetric {
   status: 'good' | 'warning' | 'critical'
 }
 
+interface ClientInfo {
+  browser: string
+  browserVersion: string
+  os: string
+  platform: string
+  screenResolution: string
+  language: string
+  cookiesEnabled: boolean
+  onlineStatus: boolean
+  connectionType: string
+  deviceMemory: string
+  hardwareConcurrency: number
+  timeZone: string
+}
+
+// Get actual client/browser information
+function getClientInfo(): ClientInfo {
+  const ua = navigator.userAgent
+  
+  // Detect browser
+  let browser = 'Unknown'
+  let browserVersion = ''
+  if (ua.includes('Firefox/')) {
+    browser = 'Firefox'
+    browserVersion = ua.split('Firefox/')[1]?.split(' ')[0] || ''
+  } else if (ua.includes('Edg/')) {
+    browser = 'Microsoft Edge'
+    browserVersion = ua.split('Edg/')[1]?.split(' ')[0] || ''
+  } else if (ua.includes('Chrome/')) {
+    browser = 'Google Chrome'
+    browserVersion = ua.split('Chrome/')[1]?.split(' ')[0] || ''
+  } else if (ua.includes('Safari/') && !ua.includes('Chrome')) {
+    browser = 'Safari'
+    browserVersion = ua.split('Version/')[1]?.split(' ')[0] || ''
+  }
+  
+  // Detect OS
+  let os = 'Unknown'
+  if (ua.includes('Windows NT 10')) os = 'Windows 10/11'
+  else if (ua.includes('Windows NT 6.3')) os = 'Windows 8.1'
+  else if (ua.includes('Windows NT 6.2')) os = 'Windows 8'
+  else if (ua.includes('Windows NT 6.1')) os = 'Windows 7'
+  else if (ua.includes('Mac OS X')) os = 'macOS'
+  else if (ua.includes('Linux')) os = 'Linux'
+  else if (ua.includes('Android')) os = 'Android'
+  else if (ua.includes('iOS') || ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS'
+  
+  // Get connection type - using type assertion for Network Information API
+  let connectionType = 'Unknown'
+  const nav = navigator as Navigator & { 
+    connection?: { effectiveType?: string; type?: string }
+    mozConnection?: { effectiveType?: string; type?: string }
+    webkitConnection?: { effectiveType?: string; type?: string }
+    deviceMemory?: number
+  }
+  const connection = nav.connection || nav.mozConnection || nav.webkitConnection
+  if (connection) {
+    connectionType = connection.effectiveType || connection.type || 'Unknown'
+  }
+  
+  // Get device memory (if available)
+  const deviceMemory = nav.deviceMemory 
+    ? `${nav.deviceMemory} GB` 
+    : 'Not available'
+
+  return {
+    browser,
+    browserVersion,
+    os,
+    platform: navigator.platform || 'Unknown',
+    screenResolution: `${window.screen.width}x${window.screen.height}`,
+    language: navigator.language,
+    cookiesEnabled: navigator.cookieEnabled,
+    onlineStatus: navigator.onLine,
+    connectionType,
+    deviceMemory,
+    hardwareConcurrency: navigator.hardwareConcurrency || 0,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  }
+}
+
 export default function Health() {
   const [health, setHealth] = useState<HealthStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [metrics, setMetrics] = useState<SystemMetric[]>([])
+  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null)
 
-  async function checkHealth() {
+  const checkHealth = useCallback(async () => {
     setIsRefreshing(true)
     const startTime = Date.now()
     try {
+      // Get actual client info
+      const info = getClientInfo()
+      setClientInfo(info)
+
       const [apiRes, dbRes] = await Promise.all([
         api.getHealth(),
         api.getDbHealth(),
@@ -82,39 +170,66 @@ export default function Health() {
         responseTime,
       })
 
-      // Mock system metrics (would come from actual monitoring in production)
+      // Type for Chrome's non-standard memory API
+      interface PerformanceMemory {
+        usedJSHeapSize: number
+        jsHeapSizeLimit: number
+        totalJSHeapSize: number
+      }
+      const perfWithMemory = performance as Performance & { memory?: PerformanceMemory }
+
+      // Get actual performance metrics where available
+      const getMemoryStatus = (): 'good' | 'warning' | 'critical' => {
+        if (perfWithMemory.memory) {
+          const memUsed = perfWithMemory.memory.usedJSHeapSize
+          const memTotal = perfWithMemory.memory.jsHeapSizeLimit
+          const percentage = (memUsed / memTotal) * 100
+          if (percentage > 80) return 'critical'
+          if (percentage > 60) return 'warning'
+        }
+        return 'good'
+      }
+
+      // Calculate actual browser memory usage if available
+      let memoryValue = 45
+      if (perfWithMemory.memory) {
+        const memUsed = perfWithMemory.memory.usedJSHeapSize
+        const memTotal = perfWithMemory.memory.jsHeapSizeLimit
+        memoryValue = Math.round((memUsed / memTotal) * 100)
+      }
+
       setMetrics([
         {
-          label: 'CPU Usage',
-          value: Math.random() * 30 + 10,
-          max: 100,
-          unit: '%',
+          label: 'CPU Cores',
+          value: info.hardwareConcurrency,
+          max: 32,
+          unit: ' cores',
           icon: Cpu,
-          status: 'good',
+          status: info.hardwareConcurrency >= 4 ? 'good' : info.hardwareConcurrency >= 2 ? 'warning' : 'critical',
         },
         {
-          label: 'Memory',
-          value: Math.random() * 40 + 30,
+          label: 'Browser Memory',
+          value: memoryValue,
           max: 100,
           unit: '%',
           icon: MemoryStick,
-          status: 'good',
+          status: getMemoryStatus(),
         },
         {
-          label: 'Storage',
-          value: 45,
-          max: 100,
-          unit: '%',
-          icon: HardDrive,
-          status: 'good',
-        },
-        {
-          label: 'Network',
-          value: Math.random() * 50 + 20,
-          max: 100,
-          unit: 'Mbps',
+          label: 'Network Latency',
+          value: responseTime,
+          max: 1000,
+          unit: 'ms',
           icon: Wifi,
-          status: 'good',
+          status: responseTime < 200 ? 'good' : responseTime < 500 ? 'warning' : 'critical',
+        },
+        {
+          label: 'Connection',
+          value: info.onlineStatus ? 100 : 0,
+          max: 100,
+          unit: info.onlineStatus ? ' Online' : ' Offline',
+          icon: Globe,
+          status: info.onlineStatus ? 'good' : 'critical',
         },
       ])
     } catch (error) {
@@ -128,12 +243,26 @@ export default function Health() {
       setIsLoading(false)
       setIsRefreshing(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     checkHealth()
     const interval = setInterval(checkHealth, 30000)
     return () => clearInterval(interval)
+  }, [checkHealth])
+
+  // Listen for online/offline status changes
+  useEffect(() => {
+    const handleOnline = () => setClientInfo(prev => prev ? { ...prev, onlineStatus: true } : null)
+    const handleOffline = () => setClientInfo(prev => prev ? { ...prev, onlineStatus: false } : null)
+    
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
   }, [])
 
   const allHealthy = health?.api && health.databases.every(db => db.connected)
@@ -185,7 +314,6 @@ export default function Health() {
         </Button>
       </div>
 
-      {/* Overall Status Banner */}
       <Card className={cn(
         "border-l-4",
         isLoading ? "border-l-blue-500" : allHealthy ? "border-l-green-500" : "border-l-red-500"
@@ -235,7 +363,6 @@ export default function Health() {
         </CardContent>
       </Card>
 
-      {/* Quick Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardContent className="p-4">
@@ -321,9 +448,7 @@ export default function Health() {
         </Card>
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Database Status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -406,7 +531,108 @@ export default function Health() {
           </CardContent>
         </Card>
 
-        {/* System Resources */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Monitor className="h-5 w-5 text-primary" />
+              Current Device Info
+            </CardTitle>
+            <CardDescription>
+              Information about your current browser and device
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {clientInfo ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <Chrome className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Browser</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {clientInfo.browser} {clientInfo.browserVersion}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Operating System</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{clientInfo.os}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <HardDrive className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Platform</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{clientInfo.platform}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <Monitor className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Screen Resolution</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{clientInfo.screenResolution}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">CPU Cores</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{clientInfo.hardwareConcurrency}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <MemoryStick className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Device Memory</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{clientInfo.deviceMemory}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <Wifi className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Connection Type</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{clientInfo.connectionType}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Language</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{clientInfo.language}</span>
+                </div>
+                <div className="flex items-center justify-between py-2 border-b">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Time Zone</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">{clientInfo.timeZone}</span>
+                </div>
+                <div className="flex items-center justify-between py-2">
+                  <div className="flex items-center gap-2">
+                    {clientInfo.onlineStatus ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className="text-sm font-medium">Connection Status</span>
+                  </div>
+                  <Badge variant={clientInfo.onlineStatus ? 'default' : 'destructive'} className={cn(
+                    clientInfo.onlineStatus ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300" : ""
+                  )}>
+                    {clientInfo.onlineStatus ? 'Online' : 'Offline'}
+                  </Badge>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -414,7 +640,7 @@ export default function Health() {
               System Resources
             </CardTitle>
             <CardDescription>
-              Server resource utilization metrics
+              Browser resource utilization metrics
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -426,20 +652,20 @@ export default function Health() {
                     <span className="font-medium text-sm">{metric.label}</span>
                   </div>
                   <span className="text-sm font-mono">
-                    {metric.value.toFixed(1)}{metric.unit}
+                    {metric.label === 'CPU Cores' ? metric.value : metric.value.toFixed(1)}{metric.unit}
                   </span>
                 </div>
                 <div className="relative">
                   <Progress 
-                    value={metric.value} 
+                    value={(metric.value / metric.max) * 100} 
                     className="h-2"
                   />
                   <div 
                     className={cn(
                       "absolute inset-0 h-2 rounded-full transition-all",
-                      getProgressColor(metric.value)
+                      getProgressColor((metric.value / metric.max) * 100)
                     )}
-                    style={{ width: `${metric.value}%` }}
+                    style={{ width: `${(metric.value / metric.max) * 100}%` }}
                   />
                 </div>
               </div>
@@ -447,7 +673,6 @@ export default function Health() {
           </CardContent>
         </Card>
 
-        {/* Services Status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -486,8 +711,7 @@ export default function Health() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Security Status */}
+        
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -526,7 +750,6 @@ export default function Health() {
         </Card>
       </div>
 
-      {/* Recent Incidents / Activity */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

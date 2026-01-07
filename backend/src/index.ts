@@ -12,6 +12,12 @@ import deviceRoutes from './routes/devices'
 import auditRoutes from './routes/audit'
 import notificationRoutes from './routes/notifications'
 import settingsRoutes from './routes/settings'
+import dashboardRoutes from './routes/dashboard'
+import suppliersRoutes from './routes/suppliers'
+import productsRoutes from './routes/products'
+import inventoryRoutes from './routes/inventory'
+import purchaseOrdersRoutes from './routes/purchase-orders'
+import posDataRoutes from './routes/pos-data'
 
 const app = express()
 
@@ -34,6 +40,12 @@ app.get('/', (req: Request, res: Response) => {
       audit: '/api/audit',
       notifications: '/api/notifications',
       settings: '/api/settings',
+      dashboard: '/api/dashboard',
+      suppliers: '/api/suppliers',
+      products: '/api/products',
+      inventory: '/api/inventory',
+      purchaseOrders: '/api/purchase-orders',
+      posData: '/api/pos-data',
     }
   })
 })
@@ -47,6 +59,12 @@ app.use('/api/devices', deviceRoutes)
 app.use('/api/audit', auditRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/settings', settingsRoutes)
+app.use('/api/dashboard', dashboardRoutes)
+app.use('/api/suppliers', suppliersRoutes)
+app.use('/api/products', productsRoutes)
+app.use('/api/inventory', inventoryRoutes)
+app.use('/api/purchase-orders', purchaseOrdersRoutes)
+app.use('/api/pos-data', posDataRoutes)
 
 app.get('/db-status', async (_req: Request, res: Response) => {
   const results = await testConnections()

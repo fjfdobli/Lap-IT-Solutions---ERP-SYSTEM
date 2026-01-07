@@ -29,7 +29,6 @@ router.get('/profile', async (req: AuthRequest, res: Response) => {
 
     const user = users[0]!
 
-    // Get user roles
     const [roles] = await erpPool.query<RowDataPacket[]>(
       `SELECT r.id, r.name FROM roles r
        JOIN user_roles ur ON r.id = ur.role_id
@@ -58,7 +57,6 @@ router.get('/profile', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Update current user profile
 router.put('/profile', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId
@@ -82,7 +80,6 @@ router.put('/profile', async (req: AuthRequest, res: Response) => {
       return
     }
 
-    // Add updated_at
     updates.push('updated_at = ?')
     params.push(new Date())
 
@@ -92,7 +89,6 @@ router.put('/profile', async (req: AuthRequest, res: Response) => {
       params
     )
 
-    // Log audit
     await erpPool.query(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, created_at)
        VALUES (?, ?, 'update', 'user_profile', ?, NOW())`,
@@ -106,7 +102,6 @@ router.put('/profile', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Change password
 router.put('/password', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId
@@ -122,7 +117,6 @@ router.put('/password', async (req: AuthRequest, res: Response) => {
       return
     }
 
-    // Get current password hash
     const [users] = await erpPool.query<RowDataPacket[]>(
       'SELECT password_hash FROM users WHERE id = ?',
       [userId]
@@ -133,24 +127,20 @@ router.put('/password', async (req: AuthRequest, res: Response) => {
       return
     }
 
-    // Verify current password
     const validPassword = await bcrypt.compare(currentPassword, users[0]!.password_hash)
     if (!validPassword) {
       res.status(400).json({ success: false, error: 'Current password is incorrect' })
       return
     }
 
-    // Hash new password
     const salt = await bcrypt.genSalt(10)
     const newPasswordHash = await bcrypt.hash(newPassword, salt)
 
-    // Update password
     await erpPool.query(
       'UPDATE users SET password_hash = ? WHERE id = ?',
       [newPasswordHash, userId]
     )
 
-    // Log audit
     await erpPool.query(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, created_at)
        VALUES (?, ?, 'password_change', 'user', ?, NOW())`,
@@ -164,12 +154,10 @@ router.put('/password', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Get notification preferences (stored in user_settings table)
 router.get('/notifications', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId
 
-    // Default preferences
     const defaults: Record<string, boolean> = {
       emailNotifications: true,
       pushNotifications: true,
@@ -182,7 +170,6 @@ router.get('/notifications', async (req: AuthRequest, res: Response) => {
       auditAlertNotifications: false,
     }
 
-    // Try to load from user_settings table
     try {
       const [settings] = await erpPool.query<RowDataPacket[]>(
         'SELECT setting_key, setting_value FROM user_settings WHERE user_id = ? AND setting_key LIKE "notification_%"',
@@ -192,7 +179,6 @@ router.get('/notifications', async (req: AuthRequest, res: Response) => {
       if (Array.isArray(settings) && settings.length > 0) {
         settings.forEach((setting: any) => {
           const key = setting.setting_key.replace('notification_', '')
-          // Convert snake_case to camelCase
           const camelKey = key.replace(/_([a-z])/g, (_: string, letter: string) => letter?.toUpperCase() ?? '')
           if (camelKey in defaults) {
             defaults[camelKey] = setting.setting_value === 'true'
@@ -200,7 +186,6 @@ router.get('/notifications', async (req: AuthRequest, res: Response) => {
         })
       }
     } catch (dbErr) {
-      // Table might not exist yet, return defaults
       console.log('user_settings table may not exist, using defaults')
     }
 
@@ -227,13 +212,11 @@ router.get('/notifications', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Update notification preferences
 router.put('/notifications', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId
     const preferences = req.body
 
-    // Try to create table if it doesn't exist
     try {
       await erpPool.query(`
         CREATE TABLE IF NOT EXISTS user_settings (
@@ -248,9 +231,7 @@ router.put('/notifications', async (req: AuthRequest, res: Response) => {
         )
       `)
 
-      // Save each preference
       for (const [key, value] of Object.entries(preferences)) {
-        // Convert camelCase to snake_case
         const snakeKey = key.replace(/([A-Z])/g, '_$1').toLowerCase()
         const settingKey = `notification_${snakeKey}`
         
@@ -264,7 +245,6 @@ router.put('/notifications', async (req: AuthRequest, res: Response) => {
       console.error('Failed to save preferences to DB:', dbErr)
     }
     
-    // Log audit
     await erpPool.query(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, old_values, created_at)
        VALUES (?, ?, 'update', 'notification_preferences', ?, ?, NOW())`,
@@ -278,7 +258,6 @@ router.put('/notifications', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Get active sessions
 router.get('/sessions', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId
@@ -298,7 +277,7 @@ router.get('/sessions', async (req: AuthRequest, res: Response) => {
           id: s.id,
           deviceInfo: s.device_info,
           ipAddress: s.ip_address,
-          lastActive: s.created_at, // Using created_at as last_active
+          lastActive: s.created_at, 
           createdAt: s.created_at,
         }))
       }
@@ -309,7 +288,6 @@ router.get('/sessions', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Revoke session
 router.delete('/sessions/:id', async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params
@@ -327,7 +305,6 @@ router.delete('/sessions/:id', async (req: AuthRequest, res: Response) => {
 
     await erpPool.query('DELETE FROM sessions WHERE id = ?', [id])
 
-    // Log audit
     await erpPool.query(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, created_at)
        VALUES (?, ?, 'session_revoke', 'session', ?, NOW())`,
@@ -341,7 +318,6 @@ router.delete('/sessions/:id', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Revoke all other sessions
 router.delete('/sessions', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId
@@ -352,7 +328,6 @@ router.delete('/sessions', async (req: AuthRequest, res: Response) => {
       [userId, currentSessionId || '']
     )
 
-    // Log audit
     await erpPool.query(
       `INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, created_at)
        VALUES (?, ?, 'sessions_revoke_all', 'user', ?, NOW())`,

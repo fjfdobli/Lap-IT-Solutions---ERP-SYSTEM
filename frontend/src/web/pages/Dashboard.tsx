@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '@/lib/api'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@/lib/use-auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { CompactClock } from '@/components/ui/real-time-clock'
 import { 
   Users, 
   Shield, 
@@ -104,7 +105,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
-  const loadStats = async (showRefresh = false) => {
+  const loadStats = useCallback(async (showRefresh = false) => {
     if (showRefresh) setIsRefreshing(true)
     else setIsLoading(true)
 
@@ -143,13 +144,15 @@ export default function Dashboard() {
       setIsLoading(false)
       setIsRefreshing(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     loadStats()
-  }, [])
+    // Auto-refresh every 10 seconds for real-time device detection
+    const interval = setInterval(() => loadStats(), 10000)
+    return () => clearInterval(interval)
+  }, [loadStats])
 
-  // Get current time greeting
   const getGreeting = () => {
     const hour = new Date().getHours()
     if (hour < 12) return 'Good morning'
@@ -179,11 +182,11 @@ export default function Dashboard() {
       href: '/users',
     },
     {
-      title: 'Connected Devices',
-      value: stats?.totalDevices || 0,
-      change: `${stats?.onlineDevices || 0} online`,
+      title: 'Online Devices',
+      value: `${stats?.onlineDevices || 0}/${stats?.totalDevices || 0}`,
+      change: stats?.onlineDevices ? `${stats.onlineDevices} online` : 'none online',
       changeType: stats?.onlineDevices ? 'positive' as const : 'neutral' as const,
-      description: 'desktop clients',
+      description: 'desktop clients connected',
       icon: Users,
       gradient: 'from-violet-500 to-violet-600',
       href: '/devices',
@@ -262,7 +265,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
@@ -272,7 +274,8 @@ export default function Dashboard() {
             Here's what's happening with your ERP system today.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <CompactClock />
           <Button
             variant="outline"
             size="sm"
@@ -289,7 +292,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statCards.map((stat) => (
           <Card 
@@ -338,9 +340,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Database Status */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
@@ -433,7 +433,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2">
@@ -495,7 +494,6 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
@@ -531,9 +529,7 @@ export default function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* System Overview */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* User Summary */}
         <Card className="card-interactive cursor-pointer" onClick={() => navigate('/users')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center justify-between">
@@ -569,7 +565,6 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Roles & Devices Summary */}
         <Card className="card-interactive cursor-pointer" onClick={() => navigate('/devices')}>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center justify-between">

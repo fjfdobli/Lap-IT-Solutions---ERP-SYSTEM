@@ -13,9 +13,6 @@ interface CreateNotificationParams {
   source?: NotificationSource
 }
 
-/**
- * Create a notification for a specific user
- */
 export async function createNotification({
   userId,
   title,
@@ -37,9 +34,6 @@ export async function createNotification({
   }
 }
 
-/**
- * Create notifications for all super admins
- */
 export async function notifySuperAdmins(
   title: string,
   message: string,
@@ -67,9 +61,6 @@ export async function notifySuperAdmins(
   }
 }
 
-/**
- * Create notification for user activity (new user, status change, etc.)
- */
 export async function notifyUserActivity(
   actionUserId: string,
   action: 'created' | 'updated' | 'deleted' | 'activated' | 'deactivated',
@@ -93,9 +84,7 @@ export async function notifyUserActivity(
   )
 }
 
-/**
- * Create notification for device activity
- */
+
 export async function notifyDeviceActivity(
   actionUserId: string,
   action: 'connected' | 'disconnected' | 'registered' | 'removed',
@@ -117,9 +106,6 @@ export async function notifyDeviceActivity(
   )
 }
 
-/**
- * Create notification for role changes
- */
 export async function notifyRoleChange(
   actionUserId: string,
   action: 'assigned' | 'removed' | 'created' | 'updated' | 'deleted',
@@ -156,9 +142,6 @@ export async function notifyRoleChange(
   )
 }
 
-/**
- * Create notification for security events
- */
 export async function notifySecurityEvent(
   userId: string,
   event: 'login' | 'logout' | 'password_change' | 'failed_login',

@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { Provider } from 'react-redux'
 import { store } from './redux/store'
 import './index.css'
-import App from './web/App'
+import App from './web/pages/App'
 import DesktopApp from './desktop/App'
 
 try {

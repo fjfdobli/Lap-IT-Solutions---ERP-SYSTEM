@@ -1,29 +1,47 @@
-import { HashRouter, Routes, Route, Link } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
+import { DesktopAuthProvider } from './lib/desktop-auth-context'
+import { DesktopProtectedRoute, DesktopPublicRoute } from './components/DesktopProtectedRoute'
+import DesktopDashboardLayout from './layouts/DesktopDashboardLayout'
 import DesktopLogin from './pages/Login'
-
-function DesktopHome() {
-  return (
-    <div style={{padding:24}}>
-      <h1>ERP Desktop</h1>
-      <p>Welcome to the desktop app.</p>
-    </div>
-  )
-}
+import DesktopDashboard from './pages/Dashboard'
+import PurchaseOrders from './pages/PurchaseOrders'
+import PurchaseOrderDetail from './pages/PurchaseOrderDetail'
+import PurchaseOrderForm from './pages/PurchaseOrderForm'
+import POSDataViewer from './pages/POSDataViewer'
+import Inventory from './pages/Inventory'
+import Suppliers from './pages/Suppliers'
+import Products from './pages/Products'
 
 export default function DesktopApp() {
   return (
-    <HashRouter>
-      <div className="top-nav" style={{padding:8}}>
-        <nav>
-          <Link to="/">Home</Link> | <Link to="/login">Login</Link>
-        </nav>
-      </div>
-      <main>
+    <DesktopAuthProvider>
+      <HashRouter>
         <Routes>
-          <Route path="/" element={<DesktopHome />} />
-          <Route path="/login" element={<DesktopLogin />} />
+          <Route element={<DesktopPublicRoute />}>
+            <Route path="/login" element={<DesktopLogin />} />
+          </Route>
+
+          <Route element={<DesktopProtectedRoute />}>
+            <Route element={<DesktopDashboardLayout />}>
+              <Route path="/" element={<DesktopDashboard />} />
+              <Route path="/purchase-orders" element={<PurchaseOrders />} />
+              <Route path="/purchase-orders/new" element={<PurchaseOrderForm />} />
+              <Route path="/purchase-orders/:id" element={<PurchaseOrderDetail />} />
+              <Route path="/purchase-orders/:id/edit" element={<PurchaseOrderForm />} />
+              <Route path="/pos-data" element={<POSDataViewer />} />
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/suppliers" element={<Suppliers />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/products/new" element={<Products />} />
+              
+              {/* Future Routes */}
+              {/* <Route path="/sales" element={<Sales />} /> */}
+              {/* <Route path="/reports" element={<Reports />} /> */}
+              {/* <Route path="/customers" element={<Customers />} /> */}
+            </Route>
+          </Route>
         </Routes>
-      </main>
-    </HashRouter>
+      </HashRouter>
+    </DesktopAuthProvider>
   )
 }

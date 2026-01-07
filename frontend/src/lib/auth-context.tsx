@@ -1,24 +1,6 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { useEffect, useState, ReactNode } from 'react'
 import { api } from '@/lib/api'
-
-interface User {
-  id: string
-  email: string
-  firstName: string
-  lastName: string
-  userType: string
-}
-
-interface AuthContextType {
-  user: User | null
-  isLoading: boolean
-  isAuthenticated: boolean
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>
-  logout: () => Promise<void>
-  checkAuth: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextType | null>(null)
+import { AuthContext, User } from './auth-types'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -60,7 +42,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (email: string, password: string, rememberMe = false) => {
-    // Web portal always uses 'web' platform
     const response = await api.login(email, password, 'web', rememberMe)
     if (response.success && response.data) {
       setUser(response.data.user)
@@ -92,12 +73,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   )
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext)
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
-  return context
 }

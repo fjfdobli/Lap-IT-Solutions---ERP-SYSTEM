@@ -60,6 +60,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const payload: JWTPayload = {
+      id: user.id,
       userId: user.id,
       email: user.email,
       userType: user.user_type
@@ -156,6 +157,7 @@ router.post('/register', async (req: Request, res: Response) => {
     )
 
     const payload: JWTPayload = {
+      id: userId,
       userId,
       email: invitation.email,
       userType: invitation.user_type
@@ -219,6 +221,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
     }
 
     const newAccessToken = generateAccessToken({
+      id: payload.userId,
       userId: payload.userId,
       email: payload.email,
       userType: payload.userType

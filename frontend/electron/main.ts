@@ -49,7 +49,8 @@ function createWindow() {
   }
 
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    icon: path.join(process.env.APP_ROOT, 'images', 'lap_it_no-bg.png'),
+    title: 'Lap IT Solutions Inc. | ERP System',
     webPreferences: webPrefs,
   })
 
@@ -69,7 +70,7 @@ function createWindow() {
     ses.webRequest.onHeadersReceived({ urls: ['*://*/*'] }, (details: any, callback: any) => {
       const headers = details.responseHeaders || {}
       headers['Content-Security-Policy'] = [
-        "default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'",
+        "default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3000 ws://localhost:5173 ws://localhost:5174 http://localhost:5173 http://localhost:5174",
       ]
       callback({ responseHeaders: headers })
     })
