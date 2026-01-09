@@ -310,6 +310,21 @@ router.post('/heartbeat', async (req: AuthRequest, res: Response) => {
       return
     }
 
+    // Check if user account is still active
+    const [users] = await erpPool.query<RowDataPacket[]>(
+      `SELECT id, is_active FROM users WHERE id = ?`,
+      [userId]
+    )
+
+    if (users.length === 0 || !users[0]!.is_active) {
+      res.json({ 
+        success: false, 
+        error: 'Your account has been deactivated by the Super Admin. Please contact your administrator.',
+        code: 'USER_DEACTIVATED' 
+      })
+      return
+    }
+
     // Check if device exists and is active
     const [devices] = await erpPool.query<RowDataPacket[]>(
       `SELECT id, device_name, is_active FROM devices WHERE device_key = ?`,
@@ -324,7 +339,7 @@ router.post('/heartbeat', async (req: AuthRequest, res: Response) => {
     const device = devices[0]!
 
     if (!device.is_active) {
-      res.status(403).json({ 
+      res.json({ 
         success: false, 
         error: 'Device has been disabled by administrator', 
         code: 'DEVICE_DISABLED' 

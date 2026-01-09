@@ -4,7 +4,7 @@ import { TableViewer } from '../components/TableViewer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { motion } from 'framer-motion'
-import { Building2, Link, Handshake, Users } from 'lucide-react'
+import { Package, FileText, ClipboardCheck, Truck } from 'lucide-react'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -24,26 +24,12 @@ const itemVariants = {
 }
 
 const tabs = [
-  {
-    id: 'inv_refsupplier',
-    label: 'Vendor Directory',
-    icon: Building2,
-    description: 'Complete supplier contact information',
-    color: 'text-violet-500',
-    bgColor: 'bg-violet-500/10',
-  },
-  {
-    id: 'inv_refitemsupplier',
-    label: 'Product Sources',
-    icon: Link,
-    description: 'Product-supplier relationships',
-    color: 'text-rose-500',
-    bgColor: 'bg-rose-500/10',
-  },
+  { id: 'mod_rr_1', label: 'Receiving Reports', icon: FileText, description: 'Goods receipt documents', color: 'text-teal-500', bgColor: 'bg-teal-500/10' },
+  { id: 'mod_rr_2', label: 'Received Items', icon: Package, description: 'Products received from suppliers', color: 'text-emerald-500', bgColor: 'bg-emerald-500/10' },
 ]
 
-export default function Suppliers() {
-  const [activeTab, setActiveTab] = useState('inv_refsupplier')
+export default function ReceivingPage() {
+  const [activeTab, setActiveTab] = useState('mod_rr_1')
   const currentTab = tabs.find(t => t.id === activeTab)
 
   return (
@@ -55,26 +41,26 @@ export default function Suppliers() {
     >
       {/* Header */}
       <motion.div variants={itemVariants}>
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 dark:from-violet-950/50 dark:via-purple-950/50 dark:to-fuchsia-950/50 overflow-hidden">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-teal-50 via-emerald-50 to-green-50 dark:from-teal-950/50 dark:via-emerald-950/50 dark:to-green-950/50 overflow-hidden">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                  <Handshake className="h-7 w-7 text-white" />
+                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-500/30">
+                  <Truck className="h-7 w-7 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                    Supplier Management
+                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">
+                    Goods Receiving
                   </CardTitle>
                   <CardDescription className="text-base mt-1">
-                    Vendor relationships and procurement partnerships
+                    Track incoming merchandise and supplier deliveries
                   </CardDescription>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="px-3 py-1.5 bg-white/80 dark:bg-slate-800/80">
-                  <Users className="h-3.5 w-3.5 mr-1.5 text-violet-500" />
-                  93 Vendors
+                  <ClipboardCheck className="h-3.5 w-3.5 mr-1.5 text-teal-500" />
+                  Inbound
                 </Badge>
               </div>
             </div>
@@ -93,7 +79,7 @@ export default function Suppliers() {
                     key={tab.id}
                     value={tab.id}
                     className={`
-                      flex items-center gap-2 px-4 py-3 rounded-xl transition-all
+                      flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all
                       data-[state=active]:shadow-md
                       data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80
                       data-[state=active]:text-primary-foreground
@@ -124,20 +110,11 @@ export default function Suppliers() {
             </motion.div>
           )}
 
-          <TabsContent value="inv_refsupplier" className="mt-0">
-            <TableViewer 
-              tableName="inv_refsupplier" 
-              title="Vendor Directory"
-              description="Complete list of suppliers and vendors with contact details"
-            />
+          <TabsContent value="mod_rr_1" className="mt-0">
+            <TableViewer tableName="mod_rr_1" title="Receiving Reports" description="Goods receipt header documents" />
           </TabsContent>
-
-          <TabsContent value="inv_refitemsupplier" className="mt-0">
-            <TableViewer 
-              tableName="inv_refitemsupplier" 
-              title="Product Sources"
-              description="Which products come from which suppliers"
-            />
+          <TabsContent value="mod_rr_2" className="mt-0">
+            <TableViewer tableName="mod_rr_2" title="Received Items" description="Products received in each delivery" />
           </TabsContent>
         </Tabs>
       </motion.div>

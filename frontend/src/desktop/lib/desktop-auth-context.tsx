@@ -73,6 +73,17 @@ export function DesktopAuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }
 
+  // Handle user account deactivated - force logout and store reason
+  const handleUserDeactivated = () => {
+    stopHeartbeat()
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('refresh_token')
+    localStorage.removeItem('desktop_user')
+    // Store reason for login page to display
+    localStorage.setItem('device_disabled_reason', 'user_deactivated')
+    setUser(null)
+  }
+
   // Check device status immediately
   const checkDeviceStatus = async () => {
     const deviceKey = getDeviceKey()
@@ -85,6 +96,10 @@ export function DesktopAuthProvider({ children }: { children: ReactNode }) {
         }
         if (response.code === 'DEVICE_NOT_FOUND') {
           handleDeviceRemoved()
+          return false
+        }
+        if (response.code === 'USER_DEACTIVATED') {
+          handleUserDeactivated()
           return false
         }
       }
@@ -112,6 +127,10 @@ export function DesktopAuthProvider({ children }: { children: ReactNode }) {
         }
         if (response.code === 'DEVICE_NOT_FOUND') {
           handleDeviceRemoved()
+          return false
+        }
+        if (response.code === 'USER_DEACTIVATED') {
+          handleUserDeactivated()
           return false
         }
       }
@@ -235,6 +254,17 @@ export function DesktopAuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string, rememberMe = false) => {
     try {
       const response = await api.login(email, password, 'desktop', rememberMe)
+      
+      // Check if user account is deactivated
+      if (!response.success && (response as any).code === 'USER_DEACTIVATED') {
+        // Store the reason for the login page to display
+        localStorage.setItem('device_disabled_reason', 'user_deactivated')
+        return { 
+          success: false, 
+          error: 'Your account has been deactivated. Please contact your administrator.' 
+        }
+      }
+      
       if (response.success && response.data) {
         const userData = response.data.user
         if (userData.userType === 'admin' || userData.userType === 'manager') {

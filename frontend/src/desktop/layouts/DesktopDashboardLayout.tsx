@@ -33,49 +33,68 @@ import {
   Search,
   Building2,
   Tag,
-  Database,
+  Truck,
+  ArrowRightLeft,
+  Calculator,
+  Receipt,
+  RotateCcw,
+  Activity,
+  Settings,
+  Layers,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 
-const mainNavItems = [
-  { 
-    to: '/', 
-    icon: LayoutDashboard, 
-    label: 'Dashboard',
-    description: 'Overview & analytics'
+// Navigation structure with collapsible groups
+const navGroups = [
+  {
+    label: 'Overview',
+    items: [
+      { to: '/', icon: LayoutDashboard, label: 'Dashboard', description: 'Overview & analytics' },
+    ]
   },
-  { 
-    to: '/purchase-orders', 
-    icon: ShoppingCart, 
-    label: 'Purchase Orders',
-    description: 'Manage POs'
+  {
+    label: 'Products & Inventory',
+    items: [
+      { to: '/products', icon: Tag, label: 'Products', description: 'Product master list' },
+      { to: '/inventory', icon: Package, label: 'Inventory', description: 'Stock levels' },
+      { to: '/item-movement', icon: Activity, label: 'Item Movement', description: 'Stock audit trail' },
+    ]
   },
-  { 
-    to: '/pos-data', 
-    icon: Database, 
-    label: 'POS Data',
-    description: 'Legacy POS records'
+  {
+    label: 'Purchasing',
+    items: [
+      { to: '/suppliers', icon: Building2, label: 'Suppliers', description: 'Vendor management' },
+      { to: '/purchase-orders', icon: ShoppingCart, label: 'Purchase Orders', description: 'Manage POs' },
+      { to: '/receiving', icon: Truck, label: 'Receiving', description: 'Goods receipt' },
+    ]
   },
-  { 
-    to: '/inventory', 
-    icon: Package, 
-    label: 'Inventory',
-    description: 'Stock management'
+  {
+    label: 'Warehouse',
+    items: [
+      { to: '/transfers', icon: ArrowRightLeft, label: 'Transfers', description: 'Stock transfers' },
+      { to: '/physical-count', icon: Calculator, label: 'Physical Count', description: 'Inventory count' },
+    ]
   },
-  { 
-    to: '/products', 
-    icon: Tag, 
-    label: 'Products',
-    description: 'Product catalog'
+  {
+    label: 'Sales & POS',
+    items: [
+      { to: '/customers', icon: Users, label: 'Customers', description: 'Customer list' },
+      { to: '/pos-transactions', icon: Receipt, label: 'POS Transactions', description: 'Sales records' },
+      { to: '/voids-returns', icon: RotateCcw, label: 'Voids & Returns', description: 'Voided/returned sales' },
+    ]
   },
-  { 
-    to: '/suppliers', 
-    icon: Building2, 
-    label: 'Suppliers',
-    description: 'Vendor management'
+  {
+    label: 'Setup',
+    items: [
+      { to: '/classifications', icon: Layers, label: 'Classifications', description: 'Categories & classes' },
+      { to: '/settings-ref', icon: Settings, label: 'Reference Data', description: 'System settings' },
+    ]
   },
 ]
+
+// Keep for backward compatibility
+const mainNavItems = navGroups.flatMap(g => g.items)
 
 const systemNavItems = [
   { 
@@ -83,12 +102,6 @@ const systemNavItems = [
     icon: FileText, 
     label: 'Reports',
     description: 'Generate reports'
-  },
-  { 
-    to: '/customers', 
-    icon: Users, 
-    label: 'Customers',
-    description: 'Customer management'
   },
 ]
 
@@ -207,7 +220,7 @@ export default function DesktopDashboardLayout() {
       )}>
         <img 
           src="/images/lap_it_no-bg.png" 
-          alt="Lap IT Solutions" 
+          alt="Lap IT Solutions Inc." 
           className="h-10 w-10 object-contain"
         />
         {!collapsed && (
@@ -218,19 +231,21 @@ export default function DesktopDashboardLayout() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto py-4 px-3">
-        <div className="space-y-1">
-          {!collapsed && (
-            <p className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2">
-              Main Menu
-            </p>
-          )}
-          {mainNavItems.map((item) => (
-            <NavItem key={item.to} item={item} collapsed={collapsed} />
-          ))}
-        </div>
+      <div className="flex-1 overflow-y-auto py-2 px-3">
+        {navGroups.map((group, groupIdx) => (
+          <div key={group.label} className={cn("space-y-1", groupIdx > 0 && "mt-4")}>
+            {!collapsed && (
+              <p className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2">
+                {group.label}
+              </p>
+            )}
+            {group.items.map((item) => (
+              <NavItem key={item.to} item={item} collapsed={collapsed} />
+            ))}
+          </div>
+        ))}
 
-        <div className="mt-8 space-y-1">
+        <div className="mt-4 space-y-1">
           {!collapsed && (
             <p className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2">
               System

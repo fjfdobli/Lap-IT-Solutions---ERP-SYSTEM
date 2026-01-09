@@ -24,17 +24,29 @@ router.post('/login', async (req: Request, res: Response) => {
       return
     }
 
-    const [users] = await erpPool.query<RowDataPacket[]>(
-      'SELECT * FROM users WHERE email = ? AND is_active = TRUE',
+    // First check if user exists (regardless of active status)
+    const [allUsers] = await erpPool.query<RowDataPacket[]>(
+      'SELECT * FROM users WHERE email = ?',
       [email]
     )
 
-    if (users.length === 0) {
+    if (allUsers.length === 0) {
       res.status(401).json({ success: false, error: 'Invalid credentials' })
       return
     }
 
-    const user = users[0] as UserWithPassword
+    const user = allUsers[0] as UserWithPassword
+
+    // Check if user account is deactivated
+    if (!user.is_active) {
+      res.status(200).json({ 
+        success: false, 
+        code: 'USER_DEACTIVATED',
+        error: 'Your account has been deactivated. Please contact your administrator.' 
+      })
+      return
+    }
+
     const isWebLogin = platform === 'web' || !platform 
     
     if (isWebLogin && user.user_type !== 'super_admin') {

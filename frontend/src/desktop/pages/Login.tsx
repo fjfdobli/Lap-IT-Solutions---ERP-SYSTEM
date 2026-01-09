@@ -187,23 +187,29 @@ export default function DesktopLogin() {
             </p>
           </div>
 
-          {/* Device Disabled Alert */}
+          {/* Device/Account Disabled Alert */}
           {deviceDisabledReason && (
             <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
               <ShieldX className="h-5 w-5" />
               <AlertTitle className="font-semibold">
-                {deviceDisabledReason === 'removed' ? 'Device Removed' : 'Device Disabled'}
+                {deviceDisabledReason === 'removed' 
+                  ? 'Device Removed' 
+                  : deviceDisabledReason === 'user_deactivated'
+                  ? 'Account Deactivated'
+                  : 'Device Disabled'}
               </AlertTitle>
               <AlertDescription className="mt-1">
                 {deviceDisabledReason === 'removed' 
                   ? 'This device has been removed by the Super Admin. Please contact your administrator if you believe this is an error.'
+                  : deviceDisabledReason === 'user_deactivated'
+                  ? 'Your account has been deactivated by the Super Admin. Please contact your administrator to re-activate your account.'
                   : 'This device has been disabled by the Super Admin. Please contact your administrator to re-enable access.'}
               </AlertDescription>
             </Alert>
           )}
 
-          {/* Error Alert */}
-          {error && (
+          {/* Error Alert - only show if no device/account status alert is displayed */}
+          {error && !deviceDisabledReason && (
             <Alert variant="destructive" className="animate-shake">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>

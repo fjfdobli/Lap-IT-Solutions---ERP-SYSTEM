@@ -4,7 +4,7 @@ import { TableViewer } from '../components/TableViewer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { motion } from 'framer-motion'
-import { Building2, Link, Handshake, Users } from 'lucide-react'
+import { ClipboardList, Package, ClipboardCheck, Calculator } from 'lucide-react'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -24,26 +24,12 @@ const itemVariants = {
 }
 
 const tabs = [
-  {
-    id: 'inv_refsupplier',
-    label: 'Vendor Directory',
-    icon: Building2,
-    description: 'Complete supplier contact information',
-    color: 'text-violet-500',
-    bgColor: 'bg-violet-500/10',
-  },
-  {
-    id: 'inv_refitemsupplier',
-    label: 'Product Sources',
-    icon: Link,
-    description: 'Product-supplier relationships',
-    color: 'text-rose-500',
-    bgColor: 'bg-rose-500/10',
-  },
+  { id: 'mod_phy_1', label: 'Count Sessions', icon: ClipboardList, description: 'Inventory count events', color: 'text-purple-500', bgColor: 'bg-purple-500/10' },
+  { id: 'mod_phy_2', label: 'Counted Items', icon: Package, description: 'Individual item counts', color: 'text-violet-500', bgColor: 'bg-violet-500/10' },
 ]
 
-export default function Suppliers() {
-  const [activeTab, setActiveTab] = useState('inv_refsupplier')
+export default function PhysicalCountPage() {
+  const [activeTab, setActiveTab] = useState('mod_phy_1')
   const currentTab = tabs.find(t => t.id === activeTab)
 
   return (
@@ -55,26 +41,26 @@ export default function Suppliers() {
     >
       {/* Header */}
       <motion.div variants={itemVariants}>
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 dark:from-violet-950/50 dark:via-purple-950/50 dark:to-fuchsia-950/50 overflow-hidden">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 via-violet-50 to-fuchsia-50 dark:from-purple-950/50 dark:via-violet-950/50 dark:to-fuchsia-950/50 overflow-hidden">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                  <Handshake className="h-7 w-7 text-white" />
+                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <Calculator className="h-7 w-7 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                    Supplier Management
+                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-violet-600 bg-clip-text text-transparent">
+                    Physical Inventory Count
                   </CardTitle>
                   <CardDescription className="text-base mt-1">
-                    Vendor relationships and procurement partnerships
+                    Reconcile actual stock with system records
                   </CardDescription>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="px-3 py-1.5 bg-white/80 dark:bg-slate-800/80">
-                  <Users className="h-3.5 w-3.5 mr-1.5 text-violet-500" />
-                  93 Vendors
+                  <ClipboardCheck className="h-3.5 w-3.5 mr-1.5 text-purple-500" />
+                  Audit
                 </Badge>
               </div>
             </div>
@@ -93,7 +79,7 @@ export default function Suppliers() {
                     key={tab.id}
                     value={tab.id}
                     className={`
-                      flex items-center gap-2 px-4 py-3 rounded-xl transition-all
+                      flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all
                       data-[state=active]:shadow-md
                       data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80
                       data-[state=active]:text-primary-foreground
@@ -124,20 +110,11 @@ export default function Suppliers() {
             </motion.div>
           )}
 
-          <TabsContent value="inv_refsupplier" className="mt-0">
-            <TableViewer 
-              tableName="inv_refsupplier" 
-              title="Vendor Directory"
-              description="Complete list of suppliers and vendors with contact details"
-            />
+          <TabsContent value="mod_phy_1" className="mt-0">
+            <TableViewer tableName="mod_phy_1" title="Inventory Count Sessions" description="Physical count events and reconciliation" />
           </TabsContent>
-
-          <TabsContent value="inv_refitemsupplier" className="mt-0">
-            <TableViewer 
-              tableName="inv_refitemsupplier" 
-              title="Product Sources"
-              description="Which products come from which suppliers"
-            />
+          <TabsContent value="mod_phy_2" className="mt-0">
+            <TableViewer tableName="mod_phy_2" title="Counted Items" description="Individual item counts and variances" />
           </TabsContent>
         </Tabs>
       </motion.div>

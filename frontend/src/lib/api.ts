@@ -39,6 +39,10 @@ class ApiService {
   ): Promise<ApiResponse<T>> {
     const token = this.getToken()
 
+    // Debug logging
+   // console.log(`[API] ${options.method || 'GET'} ${endpoint}`)
+   // console.log(`[API] Token present: ${!!token}`)
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -78,6 +82,19 @@ class ApiService {
       console.error('API request failed:', error)
       return { success: false, error: 'Network error' }
     }
+  }
+
+  // Generic GET method for any endpoint
+  async get<T = unknown>(endpoint: string): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { method: 'GET' })
+  }
+
+  // Generic POST method for any endpoint
+  async post<T = unknown>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    })
   }
 
   private async refreshAccessToken(): Promise<boolean> {
@@ -1244,6 +1261,76 @@ class ApiService {
     return this.request(`/purchase-orders/${id}/file`, { method: 'POST' })
   }
 
+  // POS Purchase Order Stats
+  async getPosPoStats() {
+    return this.request<{
+      total: { count: number; amount: number }
+      thisMonth: { count: number; amount: number }
+      thisYear: { count: number; amount: number }
+      byStatus: Record<string, { count: number; total: number }>
+      topSuppliers: Array<{ SupplierName: string; SupplierCode: string; poCount: number; totalAmount: number }>
+      recent: Array<{ id: number; xCode: string; PoDate: string; SupplierName: string; POStatus: string; Amnt_GrandCost: number; Qty_Total: number }>
+      monthlyTrend: Array<{ month: string; monthName: string; count: number; total: number }>
+    }>('/pos-data/purchase-orders/stats')
+  }
+
+  // POS Purchase Order Detail
+  async getPosPoDetail(xCode: string) {
+    return this.request<{
+      header: {
+        id: number
+        xCode: string
+        PoDate: string | null
+        POdateTime: string
+        DRDate: string | null
+        Xname: string
+        SupplierID: string
+        SupplierName: string
+        SupplierCode: string
+        Information: string
+        Terms: string
+        Remarks: string
+        POStatus: string
+        Qty_Total: number
+        Amnt_Subcost: number
+        Amnt_Shipping: number
+        Amnt_TRDiscount: number
+        Amnt_ItemDiscount: number
+        Amnt_GrandCost: number
+        DateCreate: string
+        CreateBy: string
+        DateModi: string
+        ModiBy: string
+        ForceClose: string
+      }
+      items: Array<{
+        id: number
+        xCode: string
+        PoDate: string | null
+        Xname: string
+        POStatus: string
+        SupplierID: string
+        SupplierName: string
+        SupplierCode: string
+        ItemName: string
+        ItemCode: string
+        Qty_Com: number
+        Qty_Order: number
+        Qty_Free: number
+        Amnt_Cost: number
+        Amnt_totalCost: number
+        Amnt_Percentage: number
+        Amnt_Value: number
+        Grand_Total: number
+        ForceClose: string
+        UOM: string
+        EQ: number
+        TotQty: number
+        ItemRemarks: string
+      }>
+    }>(`/pos-data/purchase-orders/${xCode}`)
+  }
+
   async getPosPoHeaders(params?: { search?: string; status?: string; page?: number; limit?: number }) {
     const searchParams = new URLSearchParams()
     if (params?.search) searchParams.append('search', params.search)
@@ -1350,7 +1437,80 @@ class ApiService {
         title: string
       }>
       pagination: { page: number; limit: number; total: number; totalPages: number }
-    }>(`/pos-data/physical-inventory/headers${query ? `?${query}` : ''}`)
+    }>(`/pos-data/physical-count/headers${query ? `?${query}` : ''}`)
+  }
+
+  // Physical Count Stats
+  async getPosPhyStats() {
+    return this.request<{
+      total: { count: number; totalAmount: number; overAmount: number; underAmount: number }
+      thisYear: number
+      itemsCounted: number
+      totalAdjustments: number
+      byStatus: Record<string, number>
+      recent: Array<{
+        id: number
+        xCode: string
+        Xname: string
+        DatesTart: string | null
+        DateEnd: string | null
+        POStatus: string
+        CheckBy: string
+        ExQty: number
+        ExAmnt: number
+        OQty: number
+        OAmnt: number
+        UQty: number
+        UAmnt: number
+      }>
+    }>('/pos-data/physical-count/stats')
+  }
+
+  // Physical Count Detail
+  async getPosPhyDetail(xCode: string) {
+    return this.request<{
+      header: {
+        id: number
+        xCode: string
+        Xname: string
+        DatesTart: string | null
+        DateEnd: string | null
+        CheckBy: string
+        Approve: string
+        Remarks: string
+        ExQty: number
+        ExAmnt: number
+        OQty: number
+        OAmnt: number
+        UQty: number
+        UAmnt: number
+        PerOQty: string
+        PerUQty: string
+        PerOAmnt: string
+        PerUAmnt: string
+        POStatus: string
+        DateCreate: string
+        CreateBy: string
+        title: string
+      }
+      items: Array<{
+        id: number
+        xCode: string
+        PhyDate: string | null
+        Xname: string
+        ItemName: string
+        ItemCode: string
+        Class: string
+        Dept: string
+        Location: string
+        SysQty: number
+        UserQty: number
+        AdjQty: number
+        AdjPer: number
+        Cost: number
+        title: string
+      }>
+    }>(`/pos-data/physical-count/${xCode}`)
   }
 
   async getPosPhyItems(params?: { xCode?: string; search?: string; page?: number; limit?: number }) {
@@ -1363,6 +1523,7 @@ class ApiService {
     return this.request<{
       records: Array<{
         id: number
+        xCode: string
         PhyDate: string | null
         Xname: string
         ItemName: string
@@ -1371,13 +1532,14 @@ class ApiService {
         Dept: string
         Location: string
         SysQty: number
+        UserQty: number
         AdjQty: number
         AdjPer: number
         Cost: number
         title: string
       }>
       pagination: { page: number; limit: number; total: number; totalPages: number }
-    }>(`/pos-data/physical-inventory/items${query ? `?${query}` : ''}`)
+    }>(`/pos-data/physical-count/items${query ? `?${query}` : ''}`)
   }
 
   async getPosSuppliers(params?: { search?: string; active?: boolean; page?: number; limit?: number }) {

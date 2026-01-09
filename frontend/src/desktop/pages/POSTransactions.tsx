@@ -4,7 +4,7 @@ import { TableViewer } from '../components/TableViewer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { motion } from 'framer-motion'
-import { Building2, Link, Handshake, Users } from 'lucide-react'
+import { Receipt, Package, CreditCard, Clock, ShoppingBag, BarChart3 } from 'lucide-react'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -25,25 +25,41 @@ const itemVariants = {
 
 const tabs = [
   {
-    id: 'inv_refsupplier',
-    label: 'Vendor Directory',
-    icon: Building2,
-    description: 'Complete supplier contact information',
-    color: 'text-violet-500',
-    bgColor: 'bg-violet-500/10',
+    id: 'pos_trans_header',
+    label: 'Sales Transactions',
+    icon: Receipt,
+    description: 'Complete sales transaction records',
+    color: 'text-green-500',
+    bgColor: 'bg-green-500/10',
   },
   {
-    id: 'inv_refitemsupplier',
-    label: 'Product Sources',
-    icon: Link,
-    description: 'Product-supplier relationships',
-    color: 'text-rose-500',
-    bgColor: 'bg-rose-500/10',
+    id: 'pos_trans_details',
+    label: 'Line Items',
+    icon: Package,
+    description: 'Individual items in each sale',
+    color: 'text-blue-500',
+    bgColor: 'bg-blue-500/10',
+  },
+  {
+    id: 'pos_trans_payment',
+    label: 'Payments',
+    icon: CreditCard,
+    description: 'Payment methods and amounts',
+    color: 'text-purple-500',
+    bgColor: 'bg-purple-500/10',
+  },
+  {
+    id: 'pos_close_shift',
+    label: 'Shift Reports',
+    icon: Clock,
+    description: 'Cashier shift summaries',
+    color: 'text-amber-500',
+    bgColor: 'bg-amber-500/10',
   },
 ]
 
-export default function Suppliers() {
-  const [activeTab, setActiveTab] = useState('inv_refsupplier')
+export default function POSTransactionsPage() {
+  const [activeTab, setActiveTab] = useState('pos_trans_header')
   const currentTab = tabs.find(t => t.id === activeTab)
 
   return (
@@ -55,26 +71,26 @@ export default function Suppliers() {
     >
       {/* Header */}
       <motion.div variants={itemVariants}>
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-violet-50 via-purple-50 to-fuchsia-50 dark:from-violet-950/50 dark:via-purple-950/50 dark:to-fuchsia-950/50 overflow-hidden">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-green-950/50 dark:via-emerald-950/50 dark:to-teal-950/50 overflow-hidden">
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
-                  <Handshake className="h-7 w-7 text-white" />
+                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                  <ShoppingBag className="h-7 w-7 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
-                    Supplier Management
+                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                    Sales Transactions
                   </CardTitle>
                   <CardDescription className="text-base mt-1">
-                    Vendor relationships and procurement partnerships
+                    Point of Sale transaction history and payment records
                   </CardDescription>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary" className="px-3 py-1.5 bg-white/80 dark:bg-slate-800/80">
-                  <Users className="h-3.5 w-3.5 mr-1.5 text-violet-500" />
-                  93 Vendors
+                  <BarChart3 className="h-3.5 w-3.5 mr-1.5 text-green-500" />
+                  Live Data
                 </Badge>
               </div>
             </div>
@@ -124,19 +140,35 @@ export default function Suppliers() {
             </motion.div>
           )}
 
-          <TabsContent value="inv_refsupplier" className="mt-0">
+          <TabsContent value="pos_trans_header" className="mt-0">
             <TableViewer 
-              tableName="inv_refsupplier" 
-              title="Vendor Directory"
-              description="Complete list of suppliers and vendors with contact details"
+              tableName="pos_trans_header" 
+              title="Sales Transactions"
+              description="Complete history of POS sales transactions"
             />
           </TabsContent>
 
-          <TabsContent value="inv_refitemsupplier" className="mt-0">
+          <TabsContent value="pos_trans_details" className="mt-0">
             <TableViewer 
-              tableName="inv_refitemsupplier" 
-              title="Product Sources"
-              description="Which products come from which suppliers"
+              tableName="pos_trans_details" 
+              title="Transaction Line Items"
+              description="Individual items sold in each transaction"
+            />
+          </TabsContent>
+
+          <TabsContent value="pos_trans_payment" className="mt-0">
+            <TableViewer 
+              tableName="pos_trans_payment" 
+              title="Payment Records"
+              description="Payment methods and amounts for each sale"
+            />
+          </TabsContent>
+
+          <TabsContent value="pos_close_shift" className="mt-0">
+            <TableViewer 
+              tableName="pos_close_shift" 
+              title="Shift Reports"
+              description="Cashier shift summaries and cash reconciliation"
             />
           </TabsContent>
         </Tabs>

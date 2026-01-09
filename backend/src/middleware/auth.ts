@@ -5,9 +5,12 @@ import { AuthRequest, JWTPayload, UserType } from '../types'
 
 export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization']
+  // console.log('[AUTH] Request to:', req.path)
+  // console.log('[AUTH] Authorization header:', authHeader ? 'Present' : 'Missing')
   const token = authHeader && authHeader.split(' ')[1] 
 
   if (!token) {
+    // console.log('[AUTH] No token extracted from header')
     res.status(401).json({ success: false, error: 'Access token required' })
     return
   }

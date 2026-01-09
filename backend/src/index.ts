@@ -18,6 +18,7 @@ import productsRoutes from './routes/products'
 import inventoryRoutes from './routes/inventory'
 import purchaseOrdersRoutes from './routes/purchase-orders'
 import posDataRoutes from './routes/pos-data'
+import posTablesRoutes from './routes/pos-tables'
 
 const app = express()
 
@@ -65,6 +66,7 @@ app.use('/api/products', productsRoutes)
 app.use('/api/inventory', inventoryRoutes)
 app.use('/api/purchase-orders', purchaseOrdersRoutes)
 app.use('/api/pos-data', posDataRoutes)
+app.use('/api/pos-tables', posTablesRoutes)
 
 app.get('/db-status', async (_req: Request, res: Response) => {
   const results = await testConnections()
