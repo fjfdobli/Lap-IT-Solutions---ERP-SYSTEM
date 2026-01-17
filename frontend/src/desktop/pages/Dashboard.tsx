@@ -62,6 +62,7 @@ import {
   Tag,
   RotateCcw,
   MapPin,
+  Check,
 } from 'lucide-react'
 import { format, subDays, subYears, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, startOfDay, endOfDay } from 'date-fns'
 import { cn } from '@/lib/utils'
@@ -549,7 +550,7 @@ export default function Dashboard() {
             </Button>
           ))}
           
-          {/* Custom Date Range */}
+          {/* Custom Date Range - Bar Style */}
           <Popover open={showCalendar} onOpenChange={setShowCalendar}>
             <PopoverTrigger asChild>
               <Button
@@ -567,47 +568,63 @@ export default function Dashboard() {
                   : 'Custom Range'}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <div className="p-4 space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700">From Date</label>
-                  <CalendarComponent
-                    mode="single"
-                    selected={customDateRange.from || undefined}
-                    onSelect={(date) => {
-                      setCustomDateRange(prev => ({ ...prev, from: date || null }))
-                      if (date && customDateRange.to) {
-                        setDatePreset('custom')
-                        setShowCalendar(false)
-                        setLoading(true)
-                      }
-                    }}
-                    disabled={(date) => date > new Date()}
-                    initialFocus
-                  />
+            <PopoverContent className="w-[380px] p-0" align="start" side="bottom" sideOffset={5}>
+              <div className="bg-white rounded-lg shadow-lg border border-slate-200">
+                {/* Header */}
+                <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
+                  <h3 className="font-semibold text-sm text-slate-900">Custom Date Range</h3>
+                  <p className="text-xs text-slate-600 mt-0.5">Select start and end dates</p>
                 </div>
-                {customDateRange.from && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-700">To Date</label>
-                    <CalendarComponent
-                      mode="single"
-                      selected={customDateRange.to || undefined}
-                      onSelect={(date) => {
-                        setCustomDateRange(prev => ({ ...prev, to: date || null }))
-                        if (date) {
-                          setDatePreset('custom')
-                          setShowCalendar(false)
-                          setLoading(true)
-                        }
+                
+                {/* Date Input Fields */}
+                <div className="p-4 space-y-3">
+                  {/* From Date */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">From Date</label>
+                    <input
+                      type="date"
+                      value={customDateRange.from ? format(customDateRange.from, 'yyyy-MM-dd') : ''}
+                      onChange={(e) => {
+                        const date = e.target.value ? new Date(e.target.value) : null
+                        setCustomDateRange(prev => ({ ...prev, from: date }))
                       }}
-                      disabled={(date) => 
-                        date > new Date() || (customDateRange.from ? date < customDateRange.from : false)
-                      }
-                      initialFocus
+                      max={format(new Date(), 'yyyy-MM-dd')}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
-                )}
-                <div className="flex gap-2">
+                  
+                  {/* To Date */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-700">To Date</label>
+                    <input
+                      type="date"
+                      value={customDateRange.to ? format(customDateRange.to, 'yyyy-MM-dd') : ''}
+                      onChange={(e) => {
+                        const date = e.target.value ? new Date(e.target.value) : null
+                        setCustomDateRange(prev => ({ ...prev, to: date }))
+                      }}
+                      min={customDateRange.from ? format(customDateRange.from, 'yyyy-MM-dd') : undefined}
+                      max={format(new Date(), 'yyyy-MM-dd')}
+                      disabled={!customDateRange.from}
+                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+                    />
+                    {!customDateRange.from && (
+                      <p className="text-xs text-slate-500">Please select "From Date" first</p>
+                    )}
+                  </div>
+                  
+                  {/* Preview */}
+                  {customDateRange.from && customDateRange.to && (
+                    <div className="px-3 py-2 bg-blue-50 rounded-md border border-blue-200">
+                      <p className="text-xs text-blue-900">
+                        <span className="font-medium">Selected Range:</span> {format(customDateRange.from, 'MMM d, yyyy')} - {format(customDateRange.to, 'MMM d, yyyy')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Footer */}
+                <div className="px-4 py-3 border-t border-slate-200 bg-slate-50 flex gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -620,6 +637,21 @@ export default function Dashboard() {
                     className="flex-1"
                   >
                     Clear
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (customDateRange.from && customDateRange.to) {
+                        setDatePreset('custom')
+                        setShowCalendar(false)
+                        setLoading(true)
+                      }
+                    }}
+                    disabled={!customDateRange.from || !customDateRange.to}
+                    style={{ backgroundColor: theme.primary, borderColor: theme.primary }}
+                    className="flex-1 text-white disabled:opacity-50"
+                  >
+                    Apply
                   </Button>
                 </div>
               </div>
