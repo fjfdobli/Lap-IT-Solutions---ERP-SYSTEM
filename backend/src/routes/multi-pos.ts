@@ -107,30 +107,47 @@ router.get('/stats/:posType', authenticateToken, async (req: AuthRequest, res: R
       return
     }
 
-    // Get today's date in format used by POS
+    // Get date range from query parameters
+    const dateFrom = req.query.dateFrom as string | undefined
+    const dateTo = req.query.dateTo as string | undefined
+    
+    console.log(`[${posType}] Date filter: ${dateFrom || 'none'} to ${dateTo || 'none'}`)
+
+    // Build date filter clause for SQL queries
+    const dateFilter = (dateFrom && dateTo) 
+      ? `AND DATE(${schema.salesDateCol}) BETWEEN '${dateFrom}' AND '${dateTo}'`
+      : ''
+    
+    const receivingDateFilter = (dateFrom && dateTo)
+      ? `AND DATE(${schema.receivingDateCol}) BETWEEN '${dateFrom}' AND '${dateTo}'`
+      : ''
+
+    // Get today's date in multiple formats (with and without leading zeros)
     const today = new Date()
     const todayStr = today.toLocaleDateString('en-US', { 
       month: '2-digit', 
       day: '2-digit', 
       year: 'numeric' 
-    })
+    }) // e.g., "01/18/2026"
+    const todayStrNoLeadingZero = today.toLocaleDateString('en-US') // e.g., "1/18/2026"
+    const todayISO = today.toISOString().split('T')[0] // e.g., "2026-01-17" for DATE() function
 
     // Common stats for all POS types
     const productCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM inv_refitem WHERE active = "True"')
     const customerCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM inv_refcustomer')
     
     // Try different transaction table names using schema config
-    let transactionCount = await safeQuery(pool, `SELECT COUNT(*) as count FROM ${schema.salesTable}`)
+    let transactionCount = await safeQuery(pool, `SELECT COUNT(*) as count FROM ${schema.salesTable} WHERE 1=1 ${dateFilter}`)
     if (!transactionCount || transactionCount[0]?.count === undefined) {
-      transactionCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM pos_trans_header_main')
+      transactionCount = await safeQuery(pool, `SELECT COUNT(*) as count FROM pos_trans_header_main WHERE 1=1 ${dateFilter}`)
     }
     if (!transactionCount || transactionCount[0]?.count === undefined) {
-      transactionCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM pos_trans_header_main1')
+      transactionCount = await safeQuery(pool, `SELECT COUNT(*) as count FROM pos_trans_header_main1 WHERE 1=1 ${dateFilter}`)
     }
 
-    // Get total sales using schema-specific column
-    console.log(`[${posType}] Querying total sales from ${schema.salesTable}.${schema.salesAmountCol}`)
-    let totalSales = await safeQuery(pool, `SELECT COALESCE(SUM(${schema.salesAmountCol}), 0) as total FROM ${schema.salesTable}`)
+    // Get total sales using schema-specific column with date filter
+    console.log(`[${posType}] Querying total sales from ${schema.salesTable}.${schema.salesAmountCol} ${dateFilter}`)
+    let totalSales = await safeQuery(pool, `SELECT COALESCE(SUM(${schema.salesAmountCol}), 0) as total FROM ${schema.salesTable} WHERE 1=1 ${dateFilter}`)
     console.log(`[${posType}] Total sales result:`, totalSales)
     
     if (!totalSales || totalSales[0]?.total === undefined || totalSales[0]?.total === null) {
@@ -145,30 +162,55 @@ router.get('/stats/:posType', authenticateToken, async (req: AuthRequest, res: R
     
     console.log(`[${posType}] Final total sales value:`, parseFloat(totalSales?.[0]?.total) || 0)
 
-    // Get today's sales
+    // Get today's sales - try DATE() function first (most reliable)
+    console.log(`[${posType}] Querying today's sales with DATE() = ${todayISO}`)
     let todaySales = await safeQuery(pool, 
-      `SELECT COALESCE(SUM(${schema.salesAmountCol}), 0) as total FROM ${schema.salesTable} WHERE ${schema.salesDateCol} LIKE ?`,
-      [`%${todayStr}%`]
+      `SELECT COALESCE(SUM(${schema.salesAmountCol}), 0) as total FROM ${schema.salesTable} WHERE DATE(${schema.salesDateCol}) = ?`,
+      [todayISO]
     )
+    
+    // Fallback: try LIKE with both date formats (with and without leading zeros)
+    if (!todaySales || todaySales[0]?.total === undefined || todaySales[0]?.total === null) {
+      console.log(`[${posType}] Fallback: trying LIKE with ${todayStr}`)
+      todaySales = await safeQuery(pool, 
+        `SELECT COALESCE(SUM(${schema.salesAmountCol}), 0) as total FROM ${schema.salesTable} 
+         WHERE ${schema.salesDateCol} LIKE ? OR ${schema.salesDateCol} LIKE ?`,
+        [`%${todayStr}%`, `%${todayStrNoLeadingZero}%`]
+      )
+    }
+    
     if (!todaySales || todaySales[0]?.total === undefined) {
       todaySales = [{ total: 0 }]
     }
+    
+    console.log(`[${posType}] Today's sales result:`, parseFloat(todaySales?.[0]?.total) || 0)
 
-    // Get receiving count
-    const receivingCount = await safeQuery(pool, `SELECT COUNT(*) as count FROM ${schema.receivingTable}`)
+    // Get receiving count with date filter
+    const receivingCount = await safeQuery(pool, `SELECT COUNT(*) as count FROM ${schema.receivingTable} WHERE 1=1 ${receivingDateFilter}`)
     console.log(`[${posType}] Receiving count result:`, receivingCount?.[0]?.count || 0)
 
-    // Get today's receiving
-    const todayReceiving = await safeQuery(pool, 
-      `SELECT COUNT(*) as count FROM ${schema.receivingTable} WHERE ${schema.receivingDateCol} LIKE ?`,
-      [`%${todayStr}%`]
+    // Get today's receiving - use DATE() function first, then fallback to LIKE
+    let todayReceiving = await safeQuery(pool, 
+      `SELECT COUNT(*) as count FROM ${schema.receivingTable} WHERE DATE(${schema.receivingDateCol}) = ?`,
+      [todayISO]
     )
+    
+    if (!todayReceiving || todayReceiving[0]?.count === undefined) {
+      todayReceiving = await safeQuery(pool, 
+        `SELECT COUNT(*) as count FROM ${schema.receivingTable} 
+         WHERE ${schema.receivingDateCol} LIKE ? OR ${schema.receivingDateCol} LIKE ?`,
+        [`%${todayStr}%`, `%${todayStrNoLeadingZero}%`]
+      )
+    }
 
-    // Get item movement count
+    // Get item movement count (no date filter for now as table structure varies)
     const movementCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM pro_itemmovement')
 
-    // Get void count
-    let voidCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM pos_void_header')
+    // Get void count with date filter (if void table has DateTrans column)
+    let voidCount = await safeQuery(pool, `SELECT COUNT(*) as count FROM pos_void_header WHERE 1=1 ${dateFilter.replace(schema.salesDateCol, 'DateTrans')}`)
+    if (!voidCount || voidCount[0]?.count === undefined) {
+      voidCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM pos_void_header')
+    }
     console.log(`[${posType}] Void count result:`, voidCount?.[0]?.count || 0)
     
     // Get shift count
@@ -182,10 +224,20 @@ router.get('/stats/:posType', authenticateToken, async (req: AuthRequest, res: R
       const tableCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM inv_reftable')
       const occupiedTables = await safeQuery(pool, 'SELECT COUNT(*) as count FROM inv_reftable WHERE xStatus = "Occupied"')
       const expenseCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM pos_expense_header')
-      const todayExpenses = await safeQuery(pool,
-        'SELECT COALESCE(SUM(TotalAmount), 0) as total FROM pos_expense_header WHERE DateTrans LIKE ?',
-        [`%${todayStr}%`]
+      
+      // Get today's expenses - use DATE() function first, then fallback to LIKE
+      let todayExpenses = await safeQuery(pool,
+        'SELECT COALESCE(SUM(TotalAmount), 0) as total FROM pos_expense_header WHERE DATE(DateTrans) = ?',
+        [todayISO]
       )
+      
+      if (!todayExpenses || todayExpenses[0]?.total === undefined) {
+        todayExpenses = await safeQuery(pool,
+          'SELECT COALESCE(SUM(TotalAmount), 0) as total FROM pos_expense_header WHERE DateTrans LIKE ? OR DateTrans LIKE ?',
+          [`%${todayStr}%`, `%${todayStrNoLeadingZero}%`]
+        )
+      }
+      
       const waiterCount = await safeQuery(pool, 'SELECT COUNT(*) as count FROM inv_refwaiter')
       
       additionalStats = {
@@ -202,33 +254,35 @@ router.get('/stats/:posType', authenticateToken, async (req: AuthRequest, res: R
       }
     }
 
-    // Get recent transactions using schema-specific columns
+    // Get recent transactions using schema-specific columns with date filter
     let recentTransactions = await safeQuery(pool,
       `SELECT ${schema.salesTransNoCol} as TempNo, ${schema.salesDateCol} as DateTrans, 
               ${schema.salesAmountCol} as NetAmount, ${schema.salesStatusCol} as xStatus, 
               ${schema.salesCashierCol} as CashierName 
        FROM ${schema.salesTable} 
+       WHERE 1=1 ${dateFilter}
        ORDER BY ID DESC LIMIT 5`
     )
     if (!recentTransactions || recentTransactions.length === 0) {
       // Fallback to generic select
-      recentTransactions = await safeQuery(pool, `SELECT * FROM ${schema.salesTable} ORDER BY ID DESC LIMIT 5`)
+      recentTransactions = await safeQuery(pool, `SELECT * FROM ${schema.salesTable} WHERE 1=1 ${dateFilter} ORDER BY ID DESC LIMIT 5`)
     }
 
-    // Get recent receiving using schema-specific columns
+    // Get recent receiving using schema-specific columns with date filter
     let recentReceiving = await safeQuery(pool,
       `SELECT ${schema.receivingNoCol} as RRNo, ${schema.receivingDateCol} as RRDate, 
               ${schema.receivingSupplierCol} as SupplierCode, ${schema.receivingAmountCol} as TotalAmount, 
               ${schema.receivingStatusCol} as xStatus 
-       FROM ${schema.receivingTable} 
+       FROM ${schema.receivingTable}
+       WHERE 1=1 ${receivingDateFilter}
        ORDER BY id DESC LIMIT 5`
     )
     if (!recentReceiving || recentReceiving.length === 0) {
       // Fallback to generic select
-      recentReceiving = await safeQuery(pool, `SELECT * FROM ${schema.receivingTable} ORDER BY id DESC LIMIT 5`)
+      recentReceiving = await safeQuery(pool, `SELECT * FROM ${schema.receivingTable} WHERE 1=1 ${receivingDateFilter} ORDER BY id DESC LIMIT 5`)
     }
 
-    // Get last 7 days of sales data for charts - simplified without date parsing
+    // Get sales data for charts with date filter
     let dailySalesData = await safeQuery(pool,
       `SELECT 
         ${schema.salesDateCol} as sale_date,
@@ -237,9 +291,10 @@ router.get('/stats/:posType', authenticateToken, async (req: AuthRequest, res: R
       FROM ${schema.salesTable}
       WHERE ${schema.salesDateCol} IS NOT NULL 
         AND ${schema.salesDateCol} != ''
+        ${dateFilter}
       GROUP BY ${schema.salesDateCol}
       ORDER BY id DESC
-      LIMIT 7`
+      LIMIT 30`
     )
 
     // Format daily sales data

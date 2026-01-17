@@ -63,8 +63,11 @@ import {
   RotateCcw,
   MapPin,
 } from 'lucide-react'
-import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns'
+import { format, subDays, subYears, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, startOfDay, endOfDay } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { CalendarIcon } from 'lucide-react'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
 
 // Animation variants
 const containerVariants = {
@@ -203,6 +206,14 @@ interface POSStats {
   hourlySales?: Array<{ hour: string; sales: number }>
 }
 
+// Date filter presets
+type DatePreset = 'today' | '7days' | '30days' | '1year' | '2years' | 'all' | 'custom'
+
+interface DateRange {
+  from: Date | null
+  to: Date | null
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user, isAuthenticated, isLoading: authLoading } = useDesktopAuth()
@@ -211,11 +222,61 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [currentTime, setCurrentTime] = useState(new Date())
+  
+  // Date filter state
+  const [datePreset, setDatePreset] = useState<DatePreset>('all')
+  const [customDateRange, setCustomDateRange] = useState<DateRange>({ from: null, to: null })
+  const [showCalendar, setShowCalendar] = useState(false)
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
+
+  // Calculate date range based on preset
+  const getDateRange = useCallback((): { from: string | null; to: string | null } => {
+    const now = new Date()
+    const today = startOfDay(now)
+    
+    switch (datePreset) {
+      case 'today':
+        return {
+          from: format(today, 'yyyy-MM-dd'),
+          to: format(endOfDay(now), 'yyyy-MM-dd')
+        }
+      case '7days':
+        return {
+          from: format(subDays(today, 6), 'yyyy-MM-dd'),
+          to: format(endOfDay(now), 'yyyy-MM-dd')
+        }
+      case '30days':
+        return {
+          from: format(subDays(today, 29), 'yyyy-MM-dd'),
+          to: format(endOfDay(now), 'yyyy-MM-dd')
+        }
+      case '1year':
+        return {
+          from: format(subYears(today, 1), 'yyyy-MM-dd'),
+          to: format(endOfDay(now), 'yyyy-MM-dd')
+        }
+      case '2years':
+        return {
+          from: format(subYears(today, 2), 'yyyy-MM-dd'),
+          to: format(endOfDay(now), 'yyyy-MM-dd')
+        }
+      case 'custom':
+        if (customDateRange.from && customDateRange.to) {
+          return {
+            from: format(startOfDay(customDateRange.from), 'yyyy-MM-dd'),
+            to: format(endOfDay(customDateRange.to), 'yyyy-MM-dd')
+          }
+        }
+        return { from: null, to: null }
+      case 'all':
+      default:
+        return { from: null, to: null }
+    }
+  }, [datePreset, customDateRange])
 
   const fetchDashboardData = useCallback(async () => {
     if (!currentPOS) {
@@ -224,7 +285,14 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await api.get<POSStats>(`/multi-pos/stats/${currentPOS}`)
+      const dateRange = getDateRange()
+      const params = new URLSearchParams()
+      if (dateRange.from) params.append('dateFrom', dateRange.from)
+      if (dateRange.to) params.append('dateTo', dateRange.to)
+      
+      const url = `/multi-pos/stats/${currentPOS}${params.toString() ? '?' + params.toString() : ''}`
+      const response = await api.get<POSStats>(url)
+      
       if (response.success && response.data) {
         setData(response.data)
       }
@@ -234,7 +302,7 @@ export default function Dashboard() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [currentPOS])
+  }, [currentPOS, getDateRange])
 
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
@@ -450,11 +518,135 @@ export default function Dashboard() {
             <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" className="gap-2">
-            <Calendar className="h-4 w-4" />
-            Today
-          </Button>
         </div>
+      </motion.div>
+      
+      {/* Date Filter Section */}
+      <motion.div variants={itemVariants} className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Period:</span>
+          {(['today', '7days', '30days', '1year', '2years', 'all'] as DatePreset[]).map((preset) => (
+            <Button
+              key={preset}
+              variant={datePreset === preset ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setDatePreset(preset)
+                setLoading(true)
+              }}
+              style={datePreset === preset ? { backgroundColor: theme.primary, borderColor: theme.primary } : {}}
+              className={cn(
+                "text-xs",
+                datePreset === preset && "text-white hover:opacity-90"
+              )}
+            >
+              {preset === 'today' && 'Today'}
+              {preset === '7days' && '7 Days'}
+              {preset === '30days' && '30 Days'}
+              {preset === '1year' && '1 Year'}
+              {preset === '2years' && '2 Years'}
+              {preset === 'all' && 'All Time'}
+            </Button>
+          ))}
+          
+          {/* Custom Date Range */}
+          <Popover open={showCalendar} onOpenChange={setShowCalendar}>
+            <PopoverTrigger asChild>
+              <Button
+                variant={datePreset === 'custom' ? "default" : "outline"}
+                size="sm"
+                className={cn(
+                  "text-xs gap-2",
+                  datePreset === 'custom' && "text-white"
+                )}
+                style={datePreset === 'custom' ? { backgroundColor: theme.primary, borderColor: theme.primary } : {}}
+              >
+                <CalendarIcon className="h-3.5 w-3.5" />
+                {datePreset === 'custom' && customDateRange.from && customDateRange.to
+                  ? `${format(customDateRange.from, 'MMM d')} - ${format(customDateRange.to, 'MMM d, yyyy')}`
+                  : 'Custom Range'}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <div className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700">From Date</label>
+                  <CalendarComponent
+                    mode="single"
+                    selected={customDateRange.from || undefined}
+                    onSelect={(date) => {
+                      setCustomDateRange(prev => ({ ...prev, from: date || null }))
+                      if (date && customDateRange.to) {
+                        setDatePreset('custom')
+                        setShowCalendar(false)
+                        setLoading(true)
+                      }
+                    }}
+                    disabled={(date) => date > new Date()}
+                    initialFocus
+                  />
+                </div>
+                {customDateRange.from && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700">To Date</label>
+                    <CalendarComponent
+                      mode="single"
+                      selected={customDateRange.to || undefined}
+                      onSelect={(date) => {
+                        setCustomDateRange(prev => ({ ...prev, to: date || null }))
+                        if (date) {
+                          setDatePreset('custom')
+                          setShowCalendar(false)
+                          setLoading(true)
+                        }
+                      }}
+                      disabled={(date) => 
+                        date > new Date() || (customDateRange.from ? date < customDateRange.from : false)
+                      }
+                      initialFocus
+                    />
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setCustomDateRange({ from: null, to: null })
+                      setDatePreset('all')
+                      setShowCalendar(false)
+                      setLoading(true)
+                    }}
+                    className="flex-1"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+        
+        {/* Show selected date range */}
+        {datePreset !== 'all' && (
+          <div className="text-xs text-slate-600 dark:text-slate-400">
+            {datePreset === 'custom' && customDateRange.from && customDateRange.to ? (
+              <span>
+                Showing data from {format(customDateRange.from, 'MMM d, yyyy')} to {format(customDateRange.to, 'MMM d, yyyy')}
+              </span>
+            ) : datePreset === 'today' ? (
+              <span>Showing today's data</span>
+            ) : datePreset === '7days' ? (
+              <span>Showing last 7 days</span>
+            ) : datePreset === '30days' ? (
+              <span>Showing last 30 days</span>
+            ) : datePreset === '1year' ? (
+              <span>Showing last 1 year</span>
+            ) : datePreset === '2years' ? (
+              <span>Showing last 2 years</span>
+            ) : null}
+          </div>
+        )}
       </motion.div>
 
       {/* Primary KPIs - Row 1 */}
