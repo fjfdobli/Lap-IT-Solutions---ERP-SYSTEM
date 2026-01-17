@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useDesktopAuth } from '../lib/use-desktop-auth'
+import { usePOS, POSType } from '../lib/pos-context'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -41,60 +42,90 @@ import {
   Activity,
   Settings,
   Layers,
+  DollarSign,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Info,
+  PackageCheck,
+  ClipboardList,
+  ChevronDown,
+  LayoutGrid,
+  Wallet,
+  ClipboardCheck,
+  UtensilsCrossed,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 
-// Navigation structure with collapsible groups
-const navGroups = [
-  {
-    label: 'Overview',
-    items: [
-      { to: '/', icon: LayoutDashboard, label: 'Dashboard', description: 'Overview & analytics' },
-    ]
-  },
-  {
-    label: 'Products & Inventory',
-    items: [
-      { to: '/products', icon: Tag, label: 'Products', description: 'Product master list' },
-      { to: '/inventory', icon: Package, label: 'Inventory', description: 'Stock levels' },
-      { to: '/item-movement', icon: Activity, label: 'Item Movement', description: 'Stock audit trail' },
-    ]
-  },
-  {
-    label: 'Purchasing',
-    items: [
-      { to: '/suppliers', icon: Building2, label: 'Suppliers', description: 'Vendor management' },
-      { to: '/purchase-orders', icon: ShoppingCart, label: 'Purchase Orders', description: 'Manage POs' },
-      { to: '/receiving', icon: Truck, label: 'Receiving', description: 'Goods receipt' },
-    ]
-  },
-  {
-    label: 'Warehouse',
-    items: [
-      { to: '/transfers', icon: ArrowRightLeft, label: 'Transfers', description: 'Stock transfers' },
-      { to: '/physical-count', icon: Calculator, label: 'Physical Count', description: 'Inventory count' },
-    ]
-  },
-  {
-    label: 'Sales & POS',
-    items: [
-      { to: '/customers', icon: Users, label: 'Customers', description: 'Customer list' },
-      { to: '/pos-transactions', icon: Receipt, label: 'POS Transactions', description: 'Sales records' },
-      { to: '/voids-returns', icon: RotateCcw, label: 'Voids & Returns', description: 'Voided/returned sales' },
-    ]
-  },
-  {
-    label: 'Setup',
-    items: [
-      { to: '/classifications', icon: Layers, label: 'Classifications', description: 'Categories & classes' },
-      { to: '/settings-ref', icon: Settings, label: 'Reference Data', description: 'System settings' },
-    ]
-  },
-]
+// Navigation items with POS availability
+const getNavGroups = (currentPOS: POSType | null) => {
+  const allGroups = [
+    {
+      label: 'Overview',
+      items: [
+        { to: '/pos-overview', icon: LayoutGrid, label: 'POS Overview', description: 'All POS systems', available: ['oasis', 'r5', 'mydiner'] },
+        { to: '/', icon: LayoutDashboard, label: 'Dashboard', description: 'POS analytics', available: ['oasis', 'r5', 'mydiner'] },
+      ]
+    },
+    {
+      label: 'Products & Inventory',
+      items: [
+        { to: '/products', icon: Tag, label: 'Products', description: 'Product master list', available: ['oasis', 'r5', 'mydiner'] },
+        { to: '/inventory', icon: Package, label: 'Inventory', description: 'Stock levels', available: ['oasis', 'r5', 'mydiner'] },
+        { to: '/item-movement', icon: Activity, label: 'Item Movement', description: 'Stock audit trail', available: ['oasis', 'r5', 'mydiner'] },
+      ]
+    },
+    {
+      label: 'Purchasing',
+      items: [
+        { to: '/suppliers', icon: Building2, label: 'Suppliers', description: 'Vendor management', available: ['oasis'] },
+        { to: '/purchase-orders', icon: ShoppingCart, label: 'Purchase Orders', description: 'Manage POs', available: ['oasis'] },
+        { to: '/receiving', icon: Truck, label: 'Receiving', description: 'Goods receipt', available: ['oasis'] },
+      ]
+    },
+    {
+      label: 'Warehouse',
+      items: [
+        { to: '/transfers', icon: ArrowRightLeft, label: 'Transfers', description: 'Stock transfers', available: ['oasis'] },
+        { to: '/physical-count', icon: Calculator, label: 'Physical Count', description: 'Inventory count', available: ['oasis'] },
+      ]
+    },
+    {
+      label: 'Restaurant',
+      items: [
+        { to: '/tables', icon: UtensilsCrossed, label: 'Tables', description: 'Table management', available: ['mydiner'] },
+        { to: '/expenses', icon: Wallet, label: 'Expenses', description: 'Expense tracking', available: ['mydiner'] },
+        { to: '/audit-trail', icon: ClipboardCheck, label: 'Audit Trail', description: 'Activity logs', available: ['mydiner'] },
+      ]
+    },
+    {
+      label: 'Sales & POS',
+      items: [
+        { to: '/customers', icon: Users, label: 'Customers', description: 'Customer list', available: ['oasis', 'r5', 'mydiner'] },
+        { to: '/pos-transactions', icon: Receipt, label: 'POS Transactions', description: 'Sales records', available: ['oasis', 'r5', 'mydiner'] },
+        { to: '/voids-returns', icon: RotateCcw, label: 'Voids & Returns', description: 'Voided/returned sales', available: ['oasis', 'r5', 'mydiner'] },
+      ]
+    },
+    {
+      label: 'Setup',
+      items: [
+        { to: '/classifications', icon: Layers, label: 'Classifications', description: 'Categories & classes', available: ['oasis', 'r5', 'mydiner'] },
+        { to: '/settings-ref', icon: Settings, label: 'Reference Data', description: 'System settings', available: ['oasis', 'r5', 'mydiner'] },
+      ]
+    },
+  ]
 
-// Keep for backward compatibility
-const mainNavItems = navGroups.flatMap(g => g.items)
+  // Filter groups and items based on current POS
+  return allGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => 
+        !currentPOS || item.available.includes(currentPOS)
+      )
+    }))
+    .filter(group => group.items.length > 0)
+}
 
 const systemNavItems = [
   { 
@@ -107,6 +138,7 @@ const systemNavItems = [
 
 export default function DesktopDashboardLayout() {
   const { user, logout } = useDesktopAuth()
+  const { currentPOS, setCurrentPOS, allConfigs } = usePOS()
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -116,6 +148,7 @@ export default function DesktopDashboardLayout() {
     title: string
     message: string
     type: string
+    source?: string
     isRead: boolean
     createdAt: string
   }>>([])
@@ -123,6 +156,8 @@ export default function DesktopDashboardLayout() {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  const navGroups = getNavGroups(currentPOS)
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -138,7 +173,7 @@ export default function DesktopDashboardLayout() {
 
   useEffect(() => {
     loadNotifications()
-    pollingIntervalRef.current = setInterval(loadNotifications, 30000)
+    pollingIntervalRef.current = setInterval(loadNotifications, 10000)
     return () => {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current)
@@ -158,12 +193,26 @@ export default function DesktopDashboardLayout() {
     }
   }
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string, source?: string) => {
+    if (source) {
+      switch (source) {
+        case 'pos_sales': return { bg: 'bg-green-100 text-green-600', icon: DollarSign }
+        case 'pos_receiving': return { bg: 'bg-blue-100 text-blue-600', icon: PackageCheck }
+        case 'pos_purchase_orders': return { bg: 'bg-violet-100 text-violet-600', icon: ClipboardList }
+        case 'pos_voids': return { bg: 'bg-red-100 text-red-600', icon: XCircle }
+        case 'pos_returns': return { bg: 'bg-orange-100 text-orange-600', icon: RotateCcw }
+        case 'pos_transfer_out': return { bg: 'bg-amber-100 text-amber-600', icon: ArrowRightLeft }
+        case 'pos_transfer_in': return { bg: 'bg-teal-100 text-teal-600', icon: ArrowRightLeft }
+        case 'pos_physical_count': return { bg: 'bg-indigo-100 text-indigo-600', icon: Calculator }
+        case 'pos_low_stock': return { bg: 'bg-red-100 text-red-600', icon: AlertTriangle }
+      }
+    }
+    
     switch (type) {
-      case 'success': return 'bg-green-100 text-green-600'
-      case 'warning': return 'bg-yellow-100 text-yellow-600'
-      case 'error': return 'bg-red-100 text-red-600'
-      default: return 'bg-blue-100 text-blue-600'
+      case 'success': return { bg: 'bg-green-100 text-green-600', icon: CheckCircle }
+      case 'warning': return { bg: 'bg-yellow-100 text-yellow-600', icon: AlertTriangle }
+      case 'error': return { bg: 'bg-red-100 text-red-600', icon: XCircle }
+      default: return { bg: 'bg-blue-100 text-blue-600', icon: Info }
     }
   }
 
@@ -172,13 +221,18 @@ export default function DesktopDashboardLayout() {
     navigate('/login')
   }
 
+  const handlePOSSelect = (pos: POSType) => {
+    setCurrentPOS(pos)
+    navigate('/')
+  }
+
   const userInitials = user
     ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
     : 'U'
 
-  const NavItem = ({ item, collapsed }: { item: typeof mainNavItems[0], collapsed: boolean }) => {
+  const NavItem = ({ item, collapsed }: { item: { to: string; icon: typeof LayoutDashboard; label: string; description: string }; collapsed: boolean }) => {
     const isActive = location.pathname === item.to || 
-      (item.to !== '/' && location.pathname.startsWith(item.to))
+      (item.to !== '/' && item.to !== '/pos-overview' && location.pathname.startsWith(item.to))
     
     return (
       <TooltipProvider delayDuration={0}>
@@ -212,8 +266,102 @@ export default function DesktopDashboardLayout() {
     )
   }
 
+  const POSSelector = ({ collapsed }: { collapsed: boolean }) => {
+    const CurrentIcon = currentPOS ? allConfigs[currentPOS].icon : LayoutGrid
+    
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className={cn(
+              'w-full flex items-center gap-2 p-2 rounded-lg transition-colors',
+              'hover:bg-sidebar-accent text-sidebar-foreground',
+              currentPOS && `border-l-4 ${allConfigs[currentPOS].borderColor}`,
+              collapsed ? 'justify-center' : 'px-3'
+            )}
+          >
+            <div className={cn(
+              'h-8 w-8 rounded-lg flex items-center justify-center',
+              currentPOS ? allConfigs[currentPOS].lightBg : 'bg-sidebar-accent'
+            )}>
+              <CurrentIcon className={cn('h-5 w-5', currentPOS ? allConfigs[currentPOS].textColor : 'text-sidebar-foreground')} />
+            </div>
+            {!collapsed && (
+              <>
+                <div className="flex-1 text-left">
+                  <p className="text-sm font-medium truncate">
+                    {currentPOS ? allConfigs[currentPOS].name : 'Select POS'}
+                  </p>
+                  <p className="text-xs text-sidebar-foreground/60 truncate">
+                    {currentPOS ? allConfigs[currentPOS].description : 'Choose a system'}
+                  </p>
+                </div>
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent 
+          className="w-64" 
+          align={collapsed ? 'center' : 'start'} 
+          side={collapsed ? 'right' : 'bottom'}
+        >
+          <DropdownMenuLabel>Select POS System</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {(['oasis', 'r5', 'mydiner'] as POSType[]).map(pos => {
+            const config = allConfigs[pos]
+            const Icon = config.icon
+            const isSelected = currentPOS === pos
+            
+            return (
+              <DropdownMenuItem
+                key={pos}
+                onClick={() => handlePOSSelect(pos)}
+                className={cn(
+                  'flex items-center gap-3 p-3 cursor-pointer',
+                  isSelected && 'bg-accent'
+                )}
+              >
+                <div className={cn(
+                  'h-10 w-10 rounded-lg flex items-center justify-center',
+                  config.lightBg
+                )}>
+                  <Icon className={cn('h-5 w-5', config.textColor)} />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">{config.name}</p>
+                  <p className="text-xs text-muted-foreground">{config.description}</p>
+                </div>
+                {isSelected && (
+                  <CheckCircle className={cn('h-5 w-5', config.textColor)} />
+                )}
+              </DropdownMenuItem>
+            )
+          })}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => {
+              setCurrentPOS(null)
+              navigate('/pos-overview')
+            }}
+            className="flex items-center gap-3 p-3"
+          >
+            <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
+              <LayoutGrid className="h-5 w-5 text-gray-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium">Overview</p>
+              <p className="text-xs text-muted-foreground">View all POS systems</p>
+            </div>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
   const SidebarContent = ({ collapsed }: { collapsed: boolean }) => (
     <div className="flex flex-col h-full bg-sidebar">
+      {/* Header */}
       <div className={cn(
         'flex items-center h-16 px-4 border-b border-sidebar-border',
         collapsed ? 'justify-center' : 'gap-3'
@@ -231,6 +379,17 @@ export default function DesktopDashboardLayout() {
         )}
       </div>
 
+      {/* POS Selector */}
+      <div className={cn('p-3 border-b border-sidebar-border', collapsed && 'px-2')}>
+        <POSSelector collapsed={collapsed} />
+      </div>
+
+      {/* Color indicator bar */}
+      {currentPOS && (
+        <div className={cn('h-1', allConfigs[currentPOS].bgColor)} />
+      )}
+
+      {/* Navigation */}
       <div className="flex-1 overflow-y-auto py-2 px-3">
         {navGroups.map((group, groupIdx) => (
           <div key={group.label} className={cn("space-y-1", groupIdx > 0 && "mt-4")}>
@@ -257,6 +416,7 @@ export default function DesktopDashboardLayout() {
         </div>
       </div>
 
+      {/* User Section */}
       <div className={cn(
         'border-t border-sidebar-border p-3',
         collapsed && 'flex justify-center'
@@ -316,6 +476,7 @@ export default function DesktopDashboardLayout() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Desktop Sidebar */}
       <aside className={cn(
         'fixed left-0 top-0 z-40 h-screen bg-sidebar transition-all duration-300 hidden lg:block',
         sidebarCollapsed ? 'w-[70px]' : 'w-64'
@@ -336,6 +497,7 @@ export default function DesktopDashboardLayout() {
         </button>
       </aside>
 
+      {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div 
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
@@ -343,6 +505,7 @@ export default function DesktopDashboardLayout() {
         />
       )}
 
+      {/* Mobile Sidebar */}
       <aside className={cn(
         'fixed left-0 top-0 z-50 h-screen w-64 bg-sidebar transition-transform duration-300 lg:hidden',
         mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
@@ -356,18 +519,40 @@ export default function DesktopDashboardLayout() {
         </button>
       </aside>
 
+      {/* Main Content */}
       <div className={cn(
         'transition-all duration-300',
         sidebarCollapsed ? 'lg:ml-[70px]' : 'lg:ml-64'
       )}>
+        {/* Header */}
         <header className="sticky top-0 z-30 h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="flex h-full items-center justify-between px-4 lg:px-6">
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="p-2 -ml-2 lg:hidden"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setMobileMenuOpen(true)}
+                className="p-2 -ml-2 lg:hidden"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+
+              {/* Current POS Badge */}
+              {currentPOS && (
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    'hidden sm:flex gap-1.5 px-3 py-1',
+                    allConfigs[currentPOS].borderColor,
+                    allConfigs[currentPOS].textColor
+                  )}
+                >
+                  {(() => {
+                    const Icon = allConfigs[currentPOS].icon
+                    return <Icon className="h-4 w-4" />
+                  })()}
+                  <span>{allConfigs[currentPOS].name}</span>
+                </Badge>
+              )}
+            </div>
 
             <div className="hidden md:flex items-center flex-1 max-w-md mx-4">
               <div className="relative w-full">
@@ -388,6 +573,7 @@ export default function DesktopDashboardLayout() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Notifications */}
               <DropdownMenu open={isNotificationOpen} onOpenChange={setIsNotificationOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="relative">
@@ -423,12 +609,18 @@ export default function DesktopDashboardLayout() {
                           )}
                           onClick={() => !notification.isRead && handleMarkAsRead(notification.id)}
                         >
-                          <div className={cn(
-                            "h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0",
-                            getNotificationIcon(notification.type)
-                          )}>
-                            <Bell className="h-4 w-4" />
-                          </div>
+                          {(() => {
+                            const iconInfo = getNotificationIcon(notification.type, notification.source)
+                            const IconComponent = iconInfo.icon
+                            return (
+                              <div className={cn(
+                                "h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0",
+                                iconInfo.bg
+                              )}>
+                                <IconComponent className="h-4 w-4" />
+                              </div>
+                            )
+                          })()}
                           <div className="flex-1 min-w-0">
                             <p className={cn(
                               "font-medium text-sm",
@@ -436,7 +628,7 @@ export default function DesktopDashboardLayout() {
                             )}>
                               {notification.title}
                             </p>
-                            <p className="text-xs text-muted-foreground line-clamp-1">
+                            <p className="text-xs text-muted-foreground line-clamp-2">
                               {notification.message}
                             </p>
                             <span className="text-[11px] text-muted-foreground/70">
@@ -453,12 +645,14 @@ export default function DesktopDashboardLayout() {
           </div>
         </header>
 
+        {/* Page Content */}
         <main className="p-4 lg:p-6 min-h-[calc(100vh-4rem)]">
           <div className="animate-fade-in">
             <Outlet />
           </div>
         </main>
 
+        {/* Footer */}
         <footer className="border-t py-4 px-6 text-center text-sm text-muted-foreground">
           <p>© 2026 Lap IT Solutions Inc. All rights reserved.</p>
         </footer>

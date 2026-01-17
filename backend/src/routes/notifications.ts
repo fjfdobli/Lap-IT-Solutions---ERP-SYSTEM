@@ -4,6 +4,7 @@ import { erpPool } from '../database/database'
 import { authenticateToken } from '../middleware/auth'
 import { AuthRequest } from '../types'
 import { RowDataPacket, ResultSetHeader } from 'mysql2'
+import { getMonitorStatus, triggerCheck, getPOSActivitySummary } from '../services/pos-monitor'
 
 const router = Router()
 
@@ -189,6 +190,36 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     })
   } catch (err) {
     console.error('Create notification error:', err)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// POS Monitor Status
+router.get('/pos-status', async (req: AuthRequest, res: Response) => {
+  try {
+    const status = getMonitorStatus()
+    const activity = await getPOSActivitySummary()
+    
+    res.json({
+      success: true,
+      data: {
+        monitor: status,
+        activity
+      }
+    })
+  } catch (err) {
+    console.error('Get POS status error:', err)
+    res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// Trigger manual POS check
+router.post('/pos-check', async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await triggerCheck()
+    res.json({ success: true, data: result })
+  } catch (err) {
+    console.error('Trigger POS check error:', err)
     res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })

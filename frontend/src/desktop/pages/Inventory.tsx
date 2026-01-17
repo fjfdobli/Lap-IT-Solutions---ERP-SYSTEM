@@ -1,175 +1,197 @@
 import { useState } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { TableViewer } from '../components/TableViewer'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { usePOS } from '../lib/pos-context'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import { POSTableViewer } from '../components/POSTableViewer'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { motion } from 'framer-motion'
-import { Package, DollarSign, Boxes, BarChart3, TrendingUp, Box } from 'lucide-react'
+import { Package, DollarSign, Box, TrendingUp, Boxes, AlertCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 },
+    transition: { staggerChildren: 0.05 },
   },
 }
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 12 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { type: 'spring' as const, stiffness: 100, damping: 12 },
+    transition: { type: 'spring', stiffness: 100, damping: 15 },
   },
 }
 
-const tabs = [
-  {
-    id: 'inv_refitem',
-    label: 'Stock Levels',
-    icon: Package,
-    description: 'Current inventory quantities',
-    color: 'text-emerald-500',
-    bgColor: 'bg-emerald-500/10',
-  },
-  {
-    id: 'inv_refitemunits',
-    label: 'Units of Measure',
-    icon: Box,
-    description: 'Unit conversions and packaging',
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-500/10',
-  },
-  {
-    id: 'inv_refitemsrp',
-    label: 'Pricing',
-    icon: DollarSign,
-    description: 'Retail price information',
-    color: 'text-amber-500',
-    bgColor: 'bg-amber-500/10',
-  },
-  {
-    id: 'inv_refitemcost',
-    label: 'Cost History',
-    icon: TrendingUp,
-    description: 'Historical cost tracking',
-    color: 'text-purple-500',
-    bgColor: 'bg-purple-500/10',
-  },
+interface TabConfig {
+  id: string
+  label: string
+  icon: any
+  description: string
+  shortLabel?: string
+}
+
+const tabs: TabConfig[] = [
+  { id: 'inv_refitem', label: 'Stock Levels', shortLabel: 'Stock', icon: Boxes, description: 'Current inventory quantities' },
+  { id: 'inv_refitemunits', label: 'Units of Measure', shortLabel: 'Units', icon: Box, description: 'Unit conversions and packaging' },
+  { id: 'inv_refitemsrp', label: 'Pricing', icon: DollarSign, description: 'Retail prices and price tiers' },
+  { id: 'inv_refitemcost', label: 'Cost History', shortLabel: 'Costs', icon: TrendingUp, description: 'Historical cost records' },
 ]
 
 export default function Inventory() {
+  const { currentPOS, posConfig } = usePOS()
   const [activeTab, setActiveTab] = useState('inv_refitem')
   const currentTab = tabs.find(t => t.id === activeTab)
 
-  return (
-    <motion.div
-      className="p-8 space-y-8 max-w-[1800px] mx-auto"
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-    >
-      {/* Header */}
-      <motion.div variants={itemVariants}>
-        <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 dark:from-emerald-950/50 dark:via-teal-950/50 dark:to-cyan-950/50 overflow-hidden">
-          <CardHeader className="pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                  <Boxes className="h-7 w-7 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-                    Inventory Management
-                  </CardTitle>
-                  <CardDescription className="text-base mt-1">
-                    Monitor stock levels, track costs, and manage inventory
-                  </CardDescription>
-                </div>
+  if (!currentPOS) {
+    return (
+      <motion.div className="p-6 max-w-[1800px] mx-auto" variants={containerVariants} initial="hidden" animate="visible">
+        <motion.div variants={itemVariants}>
+          <Card className="border border-dashed">
+            <CardContent className="flex flex-col items-center justify-center py-20">
+              <div className="h-16 w-16 rounded-2xl bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center mb-4">
+                <AlertCircle className="h-8 w-8 text-amber-600" />
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="px-3 py-1.5 bg-white/80 dark:bg-slate-800/80">
-                  <BarChart3 className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
-                  Real-time Data
-                </Badge>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-      </motion.div>
-
-      {/* Tabs */}
-      <motion.div variants={itemVariants}>
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <Card className="border-0 shadow-md mb-6">
-            <CardContent className="p-2">
-              <TabsList className="w-full h-auto flex-wrap gap-2 bg-transparent p-0">
-                {tabs.map((tab) => (
-                  <TabsTrigger
-                    key={tab.id}
-                    value={tab.id}
-                    className={`
-                      flex items-center gap-2 px-4 py-3 rounded-xl transition-all
-                      data-[state=active]:shadow-md
-                      data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80
-                      data-[state=active]:text-primary-foreground
-                    `}
-                  >
-                    <tab.icon className="h-4 w-4" />
-                    <span className="font-medium">{tab.label}</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-1">No POS System Selected</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 text-center max-w-md">
+                Please select a POS system from the sidebar to view inventory
+              </p>
             </CardContent>
           </Card>
+        </motion.div>
+      </motion.div>
+    )
+  }
 
+  const Icon = posConfig?.icon || Package
+
+  return (
+    <motion.div className="p-6 space-y-6 max-w-[1800px] mx-auto" variants={containerVariants} initial="hidden" animate="visible">
+      {/* Page Header */}
+      <motion.div variants={itemVariants} className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className={cn(
+            "h-12 w-12 rounded-xl flex items-center justify-center shadow-sm",
+            currentPOS === 'oasis' && "bg-blue-500",
+            currentPOS === 'r5' && "bg-emerald-500",
+            currentPOS === 'mydiner' && "bg-orange-500"
+          )}>
+            <Boxes className="h-6 w-6 text-white" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100">Inventory Management</h1>
+              <Badge variant="outline" className={cn(
+                "text-xs font-semibold border-0",
+                currentPOS === 'oasis' && "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400",
+                currentPOS === 'r5' && "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
+                currentPOS === 'mydiner' && "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400"
+              )}>
+                <Icon className="h-3 w-3 mr-1" />
+                {posConfig?.name}
+              </Badge>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Monitor stock levels, track costs, and manage inventory</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Tab Navigation Cards */}
+      <motion.div variants={itemVariants}>
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          {tabs.map((tab) => {
+            const isActive = activeTab === tab.id
+            return (
+              <Card
+                key={tab.id}
+                className={cn(
+                  "border cursor-pointer transition-all hover:shadow-md group",
+                  isActive && "ring-2 shadow-md",
+                  isActive && currentPOS === 'oasis' && "ring-blue-500 border-blue-200",
+                  isActive && currentPOS === 'r5' && "ring-emerald-500 border-emerald-200",
+                  isActive && currentPOS === 'mydiner' && "ring-orange-500 border-orange-200",
+                  !isActive && "border-slate-200 dark:border-slate-700 hover:border-slate-300"
+                )}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "h-10 w-10 rounded-lg flex items-center justify-center transition-colors",
+                      isActive && currentPOS === 'oasis' && "bg-blue-500 text-white",
+                      isActive && currentPOS === 'r5' && "bg-emerald-500 text-white",
+                      isActive && currentPOS === 'mydiner' && "bg-orange-500 text-white",
+                      !isActive && "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                    )}>
+                      <tab.icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className={cn(
+                        "text-sm font-semibold truncate",
+                        isActive && currentPOS === 'oasis' && "text-blue-700 dark:text-blue-400",
+                        isActive && currentPOS === 'r5' && "text-emerald-700 dark:text-emerald-400",
+                        isActive && currentPOS === 'mydiner' && "text-orange-700 dark:text-orange-400",
+                        !isActive && "text-slate-700 dark:text-slate-200"
+                      )}>
+                        {tab.shortLabel || tab.label}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{tab.label}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      </motion.div>
+
+      {/* Active Tab Content */}
+      <motion.div variants={itemVariants}>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           {currentTab && (
-            <motion.div 
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-3 mb-6"
-            >
-              <div className={`h-10 w-10 rounded-xl ${currentTab.bgColor} flex items-center justify-center`}>
-                <currentTab.icon className={`h-5 w-5 ${currentTab.color}`} />
-              </div>
-              <div>
-                <h2 className="font-semibold">{currentTab.label}</h2>
-                <p className="text-sm text-muted-foreground">{currentTab.description}</p>
-              </div>
-            </motion.div>
+            <Card className={cn(
+              "border-0 shadow-sm",
+              currentPOS === 'oasis' && "bg-blue-50/50 dark:bg-blue-950/20",
+              currentPOS === 'r5' && "bg-emerald-50/50 dark:bg-emerald-950/20",
+              currentPOS === 'mydiner' && "bg-orange-50/50 dark:bg-orange-950/20"
+            )}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "h-12 w-12 rounded-xl flex items-center justify-center",
+                    currentPOS === 'oasis' && "bg-blue-100 dark:bg-blue-900/50",
+                    currentPOS === 'r5' && "bg-emerald-100 dark:bg-emerald-900/50",
+                    currentPOS === 'mydiner' && "bg-orange-100 dark:bg-orange-900/50"
+                  )}>
+                    <currentTab.icon className={cn(
+                      "h-6 w-6",
+                      currentPOS === 'oasis' && "text-blue-600",
+                      currentPOS === 'r5' && "text-emerald-600",
+                      currentPOS === 'mydiner' && "text-orange-600"
+                    )} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">{currentTab.label}</h2>
+                    <p className="text-sm text-slate-600 dark:text-slate-400">{currentTab.description}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           <TabsContent value="inv_refitem" className="mt-0">
-            <TableViewer 
-              tableName="inv_refitem" 
-              title="Stock Levels"
-              description="Real-time inventory quantities across all products"
-            />
+            <POSTableViewer tableName="inv_refitem" title="Stock Levels" description="Real-time inventory quantities across all products" icon={<Boxes className="h-5 w-5" />} />
           </TabsContent>
-
           <TabsContent value="inv_refitemunits" className="mt-0">
-            <TableViewer 
-              tableName="inv_refitemunits" 
-              title="Units of Measure"
-              description="Unit conversions and packaging configurations"
-            />
+            <POSTableViewer tableName="inv_refitemunits" title="Units of Measure" description="Unit conversions and packaging configurations" icon={<Box className="h-5 w-5" />} />
           </TabsContent>
-
           <TabsContent value="inv_refitemsrp" className="mt-0">
-            <TableViewer 
-              tableName="inv_refitemsrp" 
-              title="Product Pricing"
-              description="Current retail prices and price structures"
-            />
+            <POSTableViewer tableName="inv_refitemsrp" title="Product Pricing" description="Retail prices and price tier configurations" icon={<DollarSign className="h-5 w-5" />} />
           </TabsContent>
-
           <TabsContent value="inv_refitemcost" className="mt-0">
-            <TableViewer 
-              tableName="inv_refitemcost" 
-              title="Cost History"
-              description="Track cost changes for informed purchasing decisions"
-            />
+            <POSTableViewer tableName="inv_refitemcost" title="Cost History" description="Historical cost records and purchase price trends" icon={<TrendingUp className="h-5 w-5" />} />
           </TabsContent>
         </Tabs>
       </motion.div>

@@ -19,6 +19,9 @@ import inventoryRoutes from './routes/inventory'
 import purchaseOrdersRoutes from './routes/purchase-orders'
 import posDataRoutes from './routes/pos-data'
 import posTablesRoutes from './routes/pos-tables'
+import dbExplorerRoutes from './routes/db-explorer'
+import multiPosRoutes from './routes/multi-pos'
+import { startPOSMonitor, stopPOSMonitor } from './services/pos-monitor'
 
 const app = express()
 
@@ -47,6 +50,8 @@ app.get('/', (req: Request, res: Response) => {
       inventory: '/api/inventory',
       purchaseOrders: '/api/purchase-orders',
       posData: '/api/pos-data',
+      dbExplorer: '/api/db-explorer',
+      multiPos: '/api/multi-pos',
     }
   })
 })
@@ -67,6 +72,8 @@ app.use('/api/inventory', inventoryRoutes)
 app.use('/api/purchase-orders', purchaseOrdersRoutes)
 app.use('/api/pos-data', posDataRoutes)
 app.use('/api/pos-tables', posTablesRoutes)
+app.use('/api/db-explorer', dbExplorerRoutes)
+app.use('/api/multi-pos', multiPosRoutes)
 
 app.get('/db-status', async (_req: Request, res: Response) => {
   const results = await testConnections()
@@ -81,13 +88,19 @@ const server = app.listen(config.port, () => {
 ;(async () => {
   try {
     const results = await testConnections()
+    let allConnected = true
     results.forEach(r => {
       if (r.ok) {
         console.log(`Database connected successfully: ${r.which}`)
       } else {
         console.error(`Database connection failed: ${r.which} — ${r.info ?? 'unknown error'}`)
+        allConnected = false
       }
     })
+    
+    if (allConnected) {
+      startPOSMonitor(15000) 
+    }
   } catch (err) {
     console.error('Error testing DB connections on startup', err)
   }
@@ -95,6 +108,7 @@ const server = app.listen(config.port, () => {
 
 async function shutdown() {
   console.log('Shutting down server...')
+  stopPOSMonitor()
   server.close(async () => {
     try {
       await closePools()

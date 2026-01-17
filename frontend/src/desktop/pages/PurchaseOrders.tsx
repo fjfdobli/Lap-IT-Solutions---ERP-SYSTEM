@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { usePOS } from '../lib/pos-context'
 import { api } from '@/lib/api'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -45,7 +46,15 @@ import {
   ArrowDownCircle,
   BarChart3,
   Boxes,
+  X,
 } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { ScrollArea as DialogScrollArea } from '@/components/ui/scroll-area'
 import { format, formatDistanceToNow } from 'date-fns'
 import {
   ChartContainer,
@@ -183,9 +192,57 @@ function formatCompactNumber(value: number): string {
 export default function PurchaseOrders() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { currentPOS, posConfig } = usePOS()
   
   // Tab state
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'purchase-orders')
+  
+  // Purchase Orders and Physical Count are OASIS-only
+  if (currentPOS && currentPOS !== 'oasis') {
+    return (
+      <motion.div
+        className="p-8 space-y-8 max-w-[1800px] mx-auto"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div variants={itemVariants}>
+          <Card className="border-0 shadow-lg">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <ShoppingCart className="h-16 w-16 text-muted-foreground/30 mb-4" />
+              <p className="text-lg font-medium">Purchase Orders Not Available</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                This module is only available for IBS OASIS POS.
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+    )
+  }
+  
+  if (!currentPOS) {
+    return (
+      <motion.div
+        className="p-8 space-y-8 max-w-[1800px] mx-auto"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div variants={itemVariants}>
+          <Card className="border-0 shadow-lg">
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <ShoppingCart className="h-16 w-16 text-amber-500/50 mb-4" />
+              <p className="text-lg font-medium">No POS System Selected</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Please select IBS OASIS from the sidebar to view Purchase Orders
+              </p>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </motion.div>
+    )
+  }
   
   // PO States
   const [purchaseOrders, setPurchaseOrders] = useState<POHeader[]>([])
@@ -200,6 +257,12 @@ export default function PurchaseOrders() {
     total: 0,
     totalPages: 0,
   })
+
+  // PO Detail Dialog State
+  const [selectedPO, setSelectedPO] = useState<POHeader | null>(null)
+  const [poDetailItems, setPODetailItems] = useState<any[]>([])
+  const [poDetailLoading, setPODetailLoading] = useState(false)
+  const [showPODetail, setShowPODetail] = useState(false)
 
   // Physical Count States
   const [physicalCounts, setPhysicalCounts] = useState<PhyHeader[]>([])
@@ -293,6 +356,25 @@ export default function PurchaseOrders() {
       setPhyLoading(false)
     }
   }, [phyStatusFilter, phySearchQuery, phyPagination.page, phyPagination.limit])
+
+  // Load PO Detail from POS database
+  const loadPODetail = useCallback(async (po: POHeader) => {
+    setSelectedPO(po)
+    setShowPODetail(true)
+    setPODetailLoading(true)
+    setPODetailItems([])
+    
+    try {
+      const response = await api.get<{ header: any; items: any[] }>(`/pos-data/purchase-orders/${po.xCode}`)
+      if (response.success && response.data) {
+        setPODetailItems(response.data.items || [])
+      }
+    } catch (error) {
+      console.error('Failed to load PO details:', error)
+    } finally {
+      setPODetailLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     loadStats()
@@ -734,7 +816,7 @@ export default function PurchaseOrders() {
                       <TableRow 
                         key={po.id} 
                         className="cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => navigate(`/purchase-orders/${po.id}`)}
+                        onClick={() => loadPODetail(po)}
                       >
                         <TableCell>
                           <div className="font-medium text-primary">{po.xCode}</div>
@@ -774,7 +856,7 @@ export default function PurchaseOrders() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/purchase-orders/${po.id}`) }}>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); loadPODetail(po) }}>
                                 <Eye className="mr-2 h-4 w-4" />
                                 View Details
                               </DropdownMenuItem>
@@ -1165,6 +1247,121 @@ export default function PurchaseOrders() {
           </motion.div>
         </TabsContent>
       </Tabs>
+
+      {/* PO Detail Dialog */}
+      <Dialog open={showPODetail} onOpenChange={setShowPODetail}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Purchase Order Details - {selectedPO?.xCode}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedPO && (
+            <DialogScrollArea className="max-h-[70vh] pr-4">
+              <div className="space-y-6">
+                {/* Header Info */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">PO Number</p>
+                    <p className="font-semibold">{selectedPO.xCode}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">Supplier</p>
+                    <p className="font-semibold">{selectedPO.SupplierName || 'N/A'}</p>
+                    <p className="text-sm text-muted-foreground">{selectedPO.SupplierCode}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">Status</p>
+                    {getStatusBadge(selectedPO.POStatus)}
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">PO Date</p>
+                    <p className="font-medium">{selectedPO.PoDate ? format(new Date(selectedPO.PoDate), 'MMM d, yyyy') : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">DR Date</p>
+                    <p className="font-medium">{selectedPO.DRDate ? format(new Date(selectedPO.DRDate), 'MMM d, yyyy') : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">Created By</p>
+                    <p className="font-medium">{selectedPO.CreateBy || 'N/A'}</p>
+                  </div>
+                </div>
+
+                {/* Totals */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">Qty Total</p>
+                    <p className="text-xl font-bold">{selectedPO.Qty_Total}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">Subtotal</p>
+                    <p className="text-lg font-semibold">{formatCurrency(selectedPO.Amnt_Subcost)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">Discount</p>
+                    <p className="text-lg font-semibold text-red-600">-{formatCurrency((selectedPO.Amnt_TRDiscount || 0) + (selectedPO.Amnt_ItemDiscount || 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase">Grand Total</p>
+                    <p className="text-xl font-bold text-primary">{formatCurrency(selectedPO.Amnt_GrandCost)}</p>
+                  </div>
+                </div>
+
+                {/* Remarks */}
+                {(selectedPO.Remarks || selectedPO.Information) && (
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase mb-1">Remarks / Notes</p>
+                    <p className="text-sm bg-muted/30 p-3 rounded">{selectedPO.Remarks || selectedPO.Information}</p>
+                  </div>
+                )}
+
+                {/* Items Table */}
+                <div>
+                  <p className="text-sm font-semibold mb-2">Line Items</p>
+                  {poDetailLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : poDetailItems.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Package className="h-10 w-10 mx-auto opacity-30 mb-2" />
+                      <p>No line items found</p>
+                    </div>
+                  ) : (
+                    <div className="border rounded-lg overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Item Code</TableHead>
+                            <TableHead>Item Name</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Unit Cost</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {poDetailItems.map((item, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-mono text-sm">{item.ItemCode}</TableCell>
+                              <TableCell>{item.ItemName}</TableCell>
+                              <TableCell className="text-right">{item.Qty_Order || item.TotQty}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(item.Amnt_Cost || 0)}</TableCell>
+                              <TableCell className="text-right font-semibold">{formatCurrency(item.Grand_Total || item.Amnt_totalCost || 0)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </DialogScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }
