@@ -23,6 +23,12 @@ const products_1 = __importDefault(require("./routes/products"));
 const inventory_1 = __importDefault(require("./routes/inventory"));
 const purchase_orders_1 = __importDefault(require("./routes/purchase-orders"));
 const pos_data_1 = __importDefault(require("./routes/pos-data"));
+const pos_tables_1 = __importDefault(require("./routes/pos-tables"));
+const db_explorer_1 = __importDefault(require("./routes/db-explorer"));
+const multi_pos_1 = __importDefault(require("./routes/multi-pos"));
+const r5_reports_1 = __importDefault(require("./routes/r5-reports"));
+const mydiner_reports_1 = __importDefault(require("./routes/mydiner-reports"));
+const pos_monitor_1 = require("./services/pos-monitor");
 const app = (0, express_1.default)();
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)(config_1.config.cors));
@@ -48,6 +54,10 @@ app.get('/', (req, res) => {
             inventory: '/api/inventory',
             purchaseOrders: '/api/purchase-orders',
             posData: '/api/pos-data',
+            dbExplorer: '/api/db-explorer',
+            multiPos: '/api/multi-pos',
+            r5Reports: '/api/r5-reports',
+            mydinerReports: '/api/mydiner-reports',
         }
     });
 });
@@ -66,6 +76,11 @@ app.use('/api/products', products_1.default);
 app.use('/api/inventory', inventory_1.default);
 app.use('/api/purchase-orders', purchase_orders_1.default);
 app.use('/api/pos-data', pos_data_1.default);
+app.use('/api/pos-tables', pos_tables_1.default);
+app.use('/api/db-explorer', db_explorer_1.default);
+app.use('/api/multi-pos', multi_pos_1.default);
+app.use('/api/r5-reports', r5_reports_1.default);
+app.use('/api/mydiner-reports', mydiner_reports_1.default);
 app.get('/db-status', async (_req, res) => {
     const results = await (0, database_1.testConnections)();
     res.json({ databases: results });
@@ -77,14 +92,19 @@ const server = app.listen(config_1.config.port, () => {
 (async () => {
     try {
         const results = await (0, database_1.testConnections)();
+        let allConnected = true;
         results.forEach(r => {
             if (r.ok) {
                 console.log(`Database connected successfully: ${r.which}`);
             }
             else {
                 console.error(`Database connection failed: ${r.which} — ${r.info ?? 'unknown error'}`);
+                allConnected = false;
             }
         });
+        if (allConnected) {
+            (0, pos_monitor_1.startPOSMonitor)(15000);
+        }
     }
     catch (err) {
         console.error('Error testing DB connections on startup', err);
@@ -92,6 +112,7 @@ const server = app.listen(config_1.config.port, () => {
 })();
 async function shutdown() {
     console.log('Shutting down server...');
+    (0, pos_monitor_1.stopPOSMonitor)();
     server.close(async () => {
         try {
             await (0, database_1.closePools)();

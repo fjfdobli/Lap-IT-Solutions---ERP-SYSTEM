@@ -38,7 +38,6 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       query += ' AND i.quantity_on_hand <= p.reorder_level'
     }
     
-    // Build count query separately to avoid regex issues with JOINs
     let countQuery = `
       SELECT COUNT(*) as total
       FROM inventory i

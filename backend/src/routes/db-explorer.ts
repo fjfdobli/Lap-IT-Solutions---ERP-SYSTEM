@@ -6,7 +6,6 @@ import { RowDataPacket } from 'mysql2'
 
 const router = Router()
 
-// Get pool by database name
 function getPool(dbName: string) {
   switch (dbName) {
     case 'erp_database':
@@ -22,7 +21,6 @@ function getPool(dbName: string) {
   }
 }
 
-// List all tables in a database
 router.get('/databases/:dbName/tables', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const dbName = req.params.dbName as string
@@ -54,7 +52,6 @@ router.get('/databases/:dbName/tables', authenticateToken, async (req: AuthReque
   }
 })
 
-// Get table structure (columns)
 router.get('/databases/:dbName/tables/:tableName/structure', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const dbName = req.params.dbName as string
@@ -92,7 +89,6 @@ router.get('/databases/:dbName/tables/:tableName/structure', authenticateToken, 
   }
 })
 
-// Get sample data from a table (first 10 rows)
 router.get('/databases/:dbName/tables/:tableName/sample', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const dbName = req.params.dbName as string
@@ -129,7 +125,6 @@ router.get('/databases/:dbName/tables/:tableName/sample', authenticateToken, asy
   }
 })
 
-// Get database overview with table counts
 router.get('/databases/:dbName/overview', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const dbName = req.params.dbName as string
@@ -140,11 +135,8 @@ router.get('/databases/:dbName/overview', authenticateToken, async (req: AuthReq
       return
     }
 
-    // Get all tables
     const [tables] = await pool.query<RowDataPacket[]>('SHOW TABLES')
     const tableNames = tables.map((row: any) => Object.values(row)[0] as string)
-
-    // Get row counts for each table
     const tableStats: Array<{ name: string; rowCount: number }> = []
     
     for (const tableName of tableNames) {
@@ -157,15 +149,13 @@ router.get('/databases/:dbName/overview', authenticateToken, async (req: AuthReq
       } catch {
         tableStats.push({
           name: tableName,
-          rowCount: -1 // Error getting count
+          rowCount: -1 
         })
       }
     }
 
-    // Sort by row count descending
     tableStats.sort((a, b) => b.rowCount - a.rowCount)
 
-    // Categorize tables by prefix
     const categories: Record<string, string[]> = {}
     for (const table of tableStats) {
       const prefix = table.name.split('_')[0] || 'other'
@@ -195,7 +185,6 @@ router.get('/databases/:dbName/overview', authenticateToken, async (req: AuthReq
   }
 })
 
-// Quick product analysis - identify what kind of products are in the database
 router.get('/databases/:dbName/product-analysis', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const dbName = req.params.dbName as string
@@ -206,11 +195,9 @@ router.get('/databases/:dbName/product-analysis', authenticateToken, async (req:
       return
     }
 
-    // Get all tables to find product-related tables
     const [tables] = await pool.query<RowDataPacket[]>('SHOW TABLES')
     const tableNames = tables.map((row: any) => Object.values(row)[0] as string)
 
-    // Look for common product table names
     const productTables = tableNames.filter(t => 
       t.toLowerCase().includes('item') || 
       t.toLowerCase().includes('product') ||
@@ -219,7 +206,6 @@ router.get('/databases/:dbName/product-analysis', authenticateToken, async (req:
       t.toLowerCase().includes('inv_ref')
     )
 
-    // Look for category/class tables
     const categoryTables = tableNames.filter(t => 
       t.toLowerCase().includes('class') || 
       t.toLowerCase().includes('category') ||
@@ -227,7 +213,6 @@ router.get('/databases/:dbName/product-analysis', authenticateToken, async (req:
       t.toLowerCase().includes('group')
     )
 
-    // Look for transaction tables
     const transactionTables = tableNames.filter(t => 
       t.toLowerCase().includes('trans') || 
       t.toLowerCase().includes('order') ||
@@ -235,7 +220,6 @@ router.get('/databases/:dbName/product-analysis', authenticateToken, async (req:
       t.toLowerCase().includes('pos_')
     )
 
-    // Try to get product samples from likely tables
     const productSamples: Array<{ table: string; sample: any[] }> = []
     
     for (const tableName of productTables.slice(0, 5)) {
@@ -250,7 +234,6 @@ router.get('/databases/:dbName/product-analysis', authenticateToken, async (req:
       }
     }
 
-    // Try to get category samples
     const categorySamples: Array<{ table: string; sample: any[] }> = []
     
     for (const tableName of categoryTables.slice(0, 3)) {
@@ -288,11 +271,9 @@ router.get('/databases/:dbName/product-analysis', authenticateToken, async (req:
   }
 })
 
-// Test all database connections
 router.get('/test-connections', authenticateToken, async (req: AuthRequest, res: Response) => {
   const results: Array<{ database: string; connected: boolean; error?: string }> = []
 
-  // Test ERP
   try {
     await erpPool.query('SELECT 1')
     results.push({ database: 'erp_database', connected: true })
@@ -300,7 +281,6 @@ router.get('/test-connections', authenticateToken, async (req: AuthRequest, res:
     results.push({ database: 'erp_database', connected: false, error: err?.message })
   }
 
-  // Test IBS POS NEW
   try {
     await posPool.query('SELECT 1')
     results.push({ database: 'ibs_pos_new', connected: true })
@@ -308,7 +288,6 @@ router.get('/test-connections', authenticateToken, async (req: AuthRequest, res:
     results.push({ database: 'ibs_pos_new', connected: false, error: err?.message })
   }
 
-  // Test IBS POS
   try {
     await ibsPosPool.query('SELECT 1')
     results.push({ database: 'ibs_pos', connected: true })
@@ -316,7 +295,6 @@ router.get('/test-connections', authenticateToken, async (req: AuthRequest, res:
     results.push({ database: 'ibs_pos', connected: false, error: err?.message })
   }
 
-  // Test MyDineIn
   try {
     await myDineInPool.query('SELECT 1')
     results.push({ database: 'mydinein', connected: true })

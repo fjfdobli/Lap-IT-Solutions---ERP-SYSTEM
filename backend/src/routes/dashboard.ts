@@ -6,7 +6,6 @@ import { RowDataPacket } from 'mysql2'
 
 const router = Router()
 
-// Safe query helper that returns default value if query fails
 async function safeQuery(
   query: string,
   defaultValue: Record<string, unknown>[] = []
@@ -27,59 +26,46 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
   console.log('Dashboard stats endpoint hit')
   
   try {
-    // ===== Master Data Stats =====
-    
-    // Total Products
     const totalProducts = await safeQuery(
       'SELECT COUNT(*) as count FROM inv_refitem',
       [{ count: 0 }]
     )
     
-    // Total Suppliers
     const totalSuppliers = await safeQuery(
       'SELECT COUNT(*) as count FROM inv_refsupplier',
       [{ count: 0 }]
     )
     
-    // Total Customers
     const totalCustomers = await safeQuery(
       'SELECT COUNT(*) as count FROM inv_refcustomer',
       [{ count: 0 }]
     )
     
-    // Total Categories/Classes
     const totalClasses = await safeQuery(
       'SELECT COUNT(*) as count FROM inv_refclass',
       [{ count: 0 }]
     )
     
-    // Total Departments
     const totalDepartments = await safeQuery(
       'SELECT COUNT(*) as count FROM inv_refdepartment',
       [{ count: 0 }]
     )
     
-    // Total Branches
     const totalBranches = await safeQuery(
       'SELECT COUNT(*) as count FROM inv_refbranch',
       [{ count: 0 }]
     )
     
-    // Total Locations
     const totalLocations = await safeQuery(
       'SELECT COUNT(*) as count FROM inv_reflocation',
       [{ count: 0 }]
     )
     
-    // ===== POS Transactions Stats (using correct column names) =====
-    
-    // Total Sales Transactions (all time) - Using NetSales instead of GrandTotal
     const totalTransactions = await safeQuery(
       'SELECT COUNT(*) as count, COALESCE(SUM(NetSales), 0) as total FROM pos_trans_header',
       [{ count: 0, total: 0 }]
     )
     
-    // Today's Sales
     const todaySales = await safeQuery(
       `SELECT COUNT(*) as count, COALESCE(SUM(NetSales), 0) as total 
        FROM pos_trans_header 
@@ -87,7 +73,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       [{ count: 0, total: 0 }]
     )
     
-    // This Week's Sales
     const weekSales = await safeQuery(
       `SELECT COUNT(*) as count, COALESCE(SUM(NetSales), 0) as total 
        FROM pos_trans_header 
@@ -95,7 +80,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       [{ count: 0, total: 0 }]
     )
     
-    // This Month's Sales
     const monthSales = await safeQuery(
       `SELECT COUNT(*) as count, COALESCE(SUM(NetSales), 0) as total 
        FROM pos_trans_header 
@@ -103,7 +87,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       [{ count: 0, total: 0 }]
     )
     
-    // Daily Sales Trend (last 30 days) - Using DiscAmount instead of Discount
     const dailySalesTrend = await safeQuery(
       `SELECT 
          DATE(DateTrans) as date,
@@ -117,7 +100,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       []
     )
     
-    // Monthly Sales Trend (last 12 months) - raw data from DB
     const monthlySalesRaw = await safeQuery(
       `SELECT 
          DATE_FORMAT(DateTrans, '%Y-%m') as month,
@@ -132,7 +114,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       []
     )
     
-    // Fill in all 12 months with zeros for months without data
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const monthlySalesTrend: Array<{ month: string; monthName: string; transactions: number; total: number; discount: number }> = []
     const now = new Date()
@@ -162,15 +143,11 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       }
     }
     
-    // ===== Receiving Stats (using POstatus instead of IsPost) =====
-    
-    // Total Receiving Reports
     const totalReceiving = await safeQuery(
       'SELECT COUNT(*) as count, COALESCE(SUM(Amnt_GrandCost), 0) as total FROM mod_rr_1',
       [{ count: 0, total: 0 }]
     )
     
-    // This Month's Receiving
     const monthReceiving = await safeQuery(
       `SELECT COUNT(*) as count 
        FROM mod_rr_1 
@@ -178,41 +155,31 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       [{ count: 0 }]
     )
     
-    // Pending Receiving (POstatus not complete)
     const pendingReceiving = await safeQuery(
       `SELECT COUNT(*) as count FROM mod_rr_1 WHERE POstatus = 'Pending' OR POstatus IS NULL OR POstatus = ''`,
       [{ count: 0 }]
     )
     
-    // ===== Transfers Stats =====
-    
-    // Total Transfer Out
     const totalTransferOut = await safeQuery(
       'SELECT COUNT(*) as count FROM mod_transferout_1',
       [{ count: 0 }]
     )
     
-    // Total Transfer In
     const totalTransferIn = await safeQuery(
       'SELECT COUNT(*) as count FROM mod_transferin_1',
       [{ count: 0 }]
     )
     
-    // ===== Voids & Returns Stats (using NetSales) =====
-    
-    // Total Voided Transactions
     const totalVoids = await safeQuery(
       'SELECT COUNT(*) as count, COALESCE(SUM(NetSales), 0) as total FROM pos_void_header',
       [{ count: 0, total: 0 }]
     )
     
-    // Total Returns
     const totalReturns = await safeQuery(
       'SELECT COUNT(*) as count, COALESCE(SUM(NetSales), 0) as total FROM pos_return_header',
       [{ count: 0, total: 0 }]
     )
     
-    // This Month's Voids
     const monthVoids = await safeQuery(
       `SELECT COUNT(*) as count, COALESCE(SUM(NetSales), 0) as total 
        FROM pos_void_header 
@@ -220,21 +187,16 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       [{ count: 0, total: 0 }]
     )
     
-    // ===== Purchase Orders Stats (using POStatus) =====
-    
-    // Total POs with value
     const totalPOs = await safeQuery(
       'SELECT COUNT(*) as count, COALESCE(SUM(Amnt_GrandCost), 0) as total FROM mod_po_1',
       [{ count: 0, total: 0 }]
     )
     
-    // Pending POs
     const pendingPOs = await safeQuery(
       `SELECT COUNT(*) as count, COALESCE(SUM(Amnt_GrandCost), 0) as total FROM mod_po_1 WHERE POStatus = 'Pending' OR POStatus IS NULL OR POStatus = ''`,
       [{ count: 0, total: 0 }]
     )
     
-    // This Month POs
     const thisMonthPOs = await safeQuery(
       `SELECT COUNT(*) as count, COALESCE(SUM(Amnt_GrandCost), 0) as total 
        FROM mod_po_1 
@@ -242,7 +204,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       [{ count: 0, total: 0 }]
     )
     
-    // Recent POs
     const recentPOs = await safeQuery(
       `SELECT id, xCode, PoDate, SupplierName, POStatus, Amnt_GrandCost, Qty_Total
        FROM mod_po_1
@@ -251,31 +212,22 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       []
     )
     
-    // ===== Physical Count Stats =====
-    
-    // Total Physical Counts
     const totalPhyCounts = await safeQuery(
       'SELECT COUNT(*) as count FROM mod_phy_1',
       [{ count: 0 }]
     )
     
-    // ===== Item Movement Stats =====
-    
-    // Total Item Movements
     const totalMovements = await safeQuery(
       'SELECT COUNT(*) as count FROM pro_itemmovement',
       [{ count: 0 }]
     )
     
-    // Recent Movements (today)
     const recentMovements = await safeQuery(
       `SELECT COUNT(*) as count FROM pro_itemmovement 
        WHERE DATE(SysDateT) = CURDATE()`,
       [{ count: 0 }]
     )
     
-    // ===== Top Selling Products (using Total instead of Amount) =====
-    // Get top products from last 12 months instead of just current year
     const topProducts = await safeQuery(
       `SELECT 
          d.ItemCode,
@@ -291,7 +243,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       []
     )
     
-    // ===== Recent Transactions (using correct column names) =====
     const recentTransactions = await safeQuery(
       `SELECT 
          h.ID,
@@ -307,7 +258,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       []
     )
     
-    // ===== Recent Receiving (using xCode as RRNo, SupplierName) =====
     const recentReceivingList = await safeQuery(
       `SELECT 
          r.id,
@@ -323,7 +273,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       []
     )
     
-    // ===== Sales by Payment Type =====
     const salesByPayment = await safeQuery(
       `SELECT 
          p.PaymentType,
@@ -335,13 +284,11 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       []
     )
     
-    // ===== Shifts/Cashier Stats =====
     const shiftStats = await safeQuery(
       `SELECT COUNT(*) as count FROM pos_close_shift`,
       [{ count: 0 }]
     )
-    
-    // ===== Inventory Distribution by Class (using Class instead of ClassCode) =====
+
     const inventoryByClass = await safeQuery(
       `SELECT 
          c.Xname as className,
@@ -359,7 +306,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
     res.json({
       success: true,
       data: {
-        // Master Data Counts
         masterData: {
           products: totalProducts[0]?.count ?? 0,
           suppliers: totalSuppliers[0]?.count ?? 0,
@@ -370,7 +316,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
           locations: totalLocations[0]?.count ?? 0,
         },
         
-        // Sales Summary
         sales: {
           total: {
             count: totalTransactions[0]?.count ?? 0,
@@ -390,13 +335,11 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
           },
         },
         
-        // Trends
         trends: {
           daily: dailySalesTrend,
           monthly: monthlySalesTrend,
         },
         
-        // Operations
         operations: {
           receiving: {
             total: totalReceiving[0]?.count ?? 0,
@@ -424,7 +367,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
           shifts: shiftStats[0]?.count ?? 0,
         },
         
-        // Adjustments
         adjustments: {
           voids: {
             count: totalVoids[0]?.count ?? 0,
@@ -440,7 +382,6 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
           },
         },
         
-        // Lists
         topProducts,
         recentTransactions,
         recentReceiving: recentReceivingList,

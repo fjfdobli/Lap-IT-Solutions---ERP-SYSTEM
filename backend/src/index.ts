@@ -21,6 +21,8 @@ import posDataRoutes from './routes/pos-data'
 import posTablesRoutes from './routes/pos-tables'
 import dbExplorerRoutes from './routes/db-explorer'
 import multiPosRoutes from './routes/multi-pos'
+import r5ReportsRoutes from './routes/r5-reports'
+import mydinerReportsRoutes from './routes/mydiner-reports'
 import { startPOSMonitor, stopPOSMonitor } from './services/pos-monitor'
 
 const app = express()
@@ -52,6 +54,8 @@ app.get('/', (req: Request, res: Response) => {
       posData: '/api/pos-data',
       dbExplorer: '/api/db-explorer',
       multiPos: '/api/multi-pos',
+      r5Reports: '/api/r5-reports',
+      mydinerReports: '/api/mydiner-reports',
     }
   })
 })
@@ -74,6 +78,8 @@ app.use('/api/pos-data', posDataRoutes)
 app.use('/api/pos-tables', posTablesRoutes)
 app.use('/api/db-explorer', dbExplorerRoutes)
 app.use('/api/multi-pos', multiPosRoutes)
+app.use('/api/r5-reports', r5ReportsRoutes)
+app.use('/api/mydiner-reports', mydinerReportsRoutes)
 
 app.get('/db-status', async (_req: Request, res: Response) => {
   const results = await testConnections()

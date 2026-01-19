@@ -218,7 +218,6 @@ router.delete('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response)
       [uuidv4(), req.user!.userId, id, JSON.stringify(devices[0])]
     )
 
-    // Notify admins about device removal
     await notifyDeviceActivity(req.user!.userId, 'removed', deviceName)
 
     res.json({ success: true, message: 'Device removed successfully' })
@@ -228,7 +227,6 @@ router.delete('/:id', requireSuperAdmin, async (req: AuthRequest, res: Response)
   }
 })
 
-// Device registration (for desktop app login)
 router.post('/register', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId
@@ -239,17 +237,14 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
       return
     }
 
-    // Check if device already exists
     const [existing] = await erpPool.query<RowDataPacket[]>(
       'SELECT * FROM devices WHERE device_key = ?',
       [deviceKey]
     )
 
     if (existing.length > 0) {
-      // Check if device is disabled - don't allow registration
       const existingDevice = existing[0]!
       if (!existingDevice.is_active) {
-        // Return 200 with success: false to avoid console errors on client
         res.json({
           success: false,
           error: 'This device has been disabled by the Super Admin. Please contact your administrator to re-enable access.',
@@ -258,7 +253,6 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
         return
       }
       
-      // Update existing device (keep is_active unchanged)
       await erpPool.query(
         `UPDATE devices SET user_id = ?, device_name = ?, last_seen = NOW() WHERE device_key = ?`,
         [userId, deviceName, deviceKey]
@@ -299,7 +293,6 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Device heartbeat (to keep device online)
 router.post('/heartbeat', async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId
@@ -310,7 +303,6 @@ router.post('/heartbeat', async (req: AuthRequest, res: Response) => {
       return
     }
 
-    // Check if user account is still active
     const [users] = await erpPool.query<RowDataPacket[]>(
       `SELECT id, is_active FROM users WHERE id = ?`,
       [userId]
@@ -325,7 +317,6 @@ router.post('/heartbeat', async (req: AuthRequest, res: Response) => {
       return
     }
 
-    // Check if device exists and is active
     const [devices] = await erpPool.query<RowDataPacket[]>(
       `SELECT id, device_name, is_active FROM devices WHERE device_key = ?`,
       [deviceKey]
@@ -347,7 +338,6 @@ router.post('/heartbeat', async (req: AuthRequest, res: Response) => {
       return
     }
 
-    // Update last seen
     await erpPool.query(
       `UPDATE devices SET last_seen = NOW(), user_id = ? WHERE device_key = ?`,
       [userId, deviceKey]
@@ -368,7 +358,6 @@ router.post('/heartbeat', async (req: AuthRequest, res: Response) => {
   }
 })
 
-// Check device status (for desktop app to verify if still allowed)
 router.get('/status/:deviceKey', async (req: AuthRequest, res: Response) => {
   try {
     const { deviceKey } = req.params

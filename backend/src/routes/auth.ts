@@ -24,7 +24,6 @@ router.post('/login', async (req: Request, res: Response) => {
       return
     }
 
-    // First check if user exists (regardless of active status)
     const [allUsers] = await erpPool.query<RowDataPacket[]>(
       'SELECT * FROM users WHERE email = ?',
       [email]
@@ -37,7 +36,6 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const user = allUsers[0] as UserWithPassword
 
-    // Check if user account is deactivated
     if (!user.is_active) {
       res.status(200).json({ 
         success: false, 
@@ -82,9 +80,6 @@ router.post('/login', async (req: Request, res: Response) => {
     const refreshToken = generateRefreshToken(payload)
 
     const sessionId = uuidv4()
-    // Set session expiry based on rememberMe:
-    // If rememberMe is true: 30 days
-    // If rememberMe is false: 7 days (default)
     const sessionDays = rememberMe ? 30 : 7
     const expiresAt = new Date(Date.now() + sessionDays * 24 * 60 * 60 * 1000)
     const now = new Date()

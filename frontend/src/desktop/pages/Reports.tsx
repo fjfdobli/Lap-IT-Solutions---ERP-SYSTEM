@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -16,13 +16,18 @@ import {
   Package,
   DollarSign,
   TrendingUp,
-  Truck,
   BarChart3,
   AlertTriangle,
+  Users,
+  CreditCard,
+  Store,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import jsPDF from 'jspdf'
+import type { jsPDF as JsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { usePOS } from '../lib/pos-context'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -37,39 +42,8 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 },
 }
 
-interface ReportData {
-  masterData: {
-    products: number
-    suppliers: number
-    customers: number
-    classes: number
-    departments: number
-    branches: number
-    locations: number
-  }
-  sales: {
-    total: { count: number; amount: number }
-    today: { count: number; amount: number }
-    thisWeek: { count: number; amount: number }
-    thisMonth: { count: number; amount: number }
-  }
-  operations: {
-    receiving: { total: number; totalValue: number; thisMonth: number; pending: number }
-    transfers: { out: number; in: number }
-    purchaseOrders: { total: number; totalValue: number; pending: number; pendingValue: number; thisMonth: number; thisMonthValue: number }
-    physicalCount: number
-    itemMovements: { total: number; today: number }
-  }
-  adjustments: {
-    voids: { count: number; amount: number }
-    returns: { count: number; amount: number }
-  }
-  topProducts: Array<{ ItemCode: string; productName: string; totalQty: number; totalAmount: number; transactionCount: number }>
-  inventoryByClass: Array<{ className: string; productCount: number }>
-  salesByPayment: Array<{ PaymentType: string; count: number; total: number }>
-}
-
-const reportTypes = [
+// Report types for OASIS (existing)
+const oasisReportTypes = [
   { value: 'executive', label: 'Executive Summary', icon: BarChart3, description: 'High-level overview of all business metrics' },
   { value: 'sales', label: 'Sales Report', icon: DollarSign, description: 'Detailed sales transactions and revenue' },
   { value: 'inventory', label: 'Inventory Report', icon: Package, description: 'Stock levels and product distribution' },
@@ -77,28 +51,95 @@ const reportTypes = [
   { value: 'operations', label: 'Operations Report', icon: TrendingUp, description: 'Transfers, counts, and movements' },
 ]
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP',
-    minimumFractionDigits: 2,
-  }).format(value)
+// Report types for R5 (retail-focused)
+const r5ReportTypes = [
+  { value: 'sales', label: 'Sales Report', icon: DollarSign, description: 'Daily/Weekly/Monthly sales and payment analysis' },
+  { value: 'product-performance', label: 'Product Performance', icon: TrendingUp, description: 'Top sellers and slow-moving items' },
+  { value: 'inventory', label: 'Inventory Report', icon: Package, description: 'Stock levels and inventory valuation' },
+  { value: 'customer', label: 'Customer Analysis', icon: Users, description: 'Top customers and AR aging' },
+  { value: 'daily-cash', label: 'Daily Cash Report', icon: CreditCard, description: 'Cash breakdown and payment summary' },
+]
+
+// Report types for MyDiner (restaurant-focused)
+const mydinerReportTypes = [
+  { value: 'sales', label: 'Sales Report', icon: DollarSign, description: 'Sales by server and table turnover' },
+  { value: 'menu-performance', label: 'Menu Performance', icon: TrendingUp, description: 'Best-selling dishes and profitability' },
+  { value: 'order-analysis', label: 'Order Analysis', icon: BarChart3, description: 'Order patterns and peak hours' },
+  { value: 'expense', label: 'Expense Report', icon: AlertTriangle, description: 'Daily expenses and cost analysis' },
+  { value: 'inventory', label: 'Inventory Report', icon: Package, description: 'Ingredient levels and wastage' },
+  { value: 'server-performance', label: 'Server Performance', icon: Users, description: 'Sales and tips by server' },
+  { value: 'customer', label: 'Customer Report', icon: Users, description: 'Regular customers and preferences' },
+]
+
+
+
+type ReportData = {
+  stats?: Record<string, unknown>
+  [key: string]: unknown
 }
 
 export default function Reports() {
+  const { currentPOS, posConfig } = usePOS()
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [data, setData] = useState<ReportData | null>(null)
-  const [reportType, setReportType] = useState('executive')
+  const [reportType, setReportType] = useState('')
   const [error, setError] = useState<string | null>(null)
 
+  // Get report types based on current POS
+  const getReportTypes = () => {
+    if (!currentPOS) return []
+    
+    switch (currentPOS) {
+      case 'oasis':
+        return oasisReportTypes
+      case 'r5':
+        return r5ReportTypes
+      case 'mydiner':
+        return mydinerReportTypes
+      default:
+        return []
+    }
+  }
+
+  const reportTypes = getReportTypes()
+
+  // Set default report type when POS changes
+    useEffect(() => {
+      if (reportTypes.length > 0) {
+        setReportType(reportTypes[0].value)
+        setData(null) // Clear previous data when POS changes
+      }
+    }, [reportTypes])
+
+  // Get API endpoint based on current POS
+  const getApiEndpoint = useCallback((): string | null => {
+    if (!currentPOS) return null
+    switch (currentPOS) {
+      case 'oasis':
+        return '/dashboard/stats'
+      case 'r5':
+        return '/r5-reports/stats'
+      case 'mydiner':
+        return '/mydiner-reports/stats' // Will be implemented later
+      default:
+        return null
+    }
+  }, [currentPOS])
+
   const fetchReportData = useCallback(async () => {
+    const endpoint = getApiEndpoint()
+    if (!endpoint) {
+      setError('No API endpoint configured for this POS')
+      return
+    }
+
     setLoading(true)
     setError(null)
     try {
-      const response = await api.get<ReportData>('/dashboard/stats')
+      const response = await api.get<ReportData>(endpoint)
       if (response.success && response.data) {
-        setData(response.data)
+        setData(response.data ?? null)
       } else {
         setError('Failed to fetch report data')
       }
@@ -108,16 +149,28 @@ export default function Reports() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [getApiEndpoint])
 
   const generatePDF = async () => {
+    if (!currentPOS || !posConfig) {
+      setError('Please select a POS system first')
+      return
+    }
+
     let reportData = data
     if (!reportData) {
       setLoading(true)
       try {
-        const response = await api.get<ReportData>('/dashboard/stats')
+        const endpoint = getApiEndpoint()
+        if (!endpoint) {
+          setError('No API endpoint configured for this POS')
+          setLoading(false)
+          return
+        }
+
+        const response = await api.get<ReportData>(endpoint)
         if (response.success && response.data) {
-          reportData = response.data
+          reportData = response.data ?? reportData
           setData(reportData)
         } else {
           setError('Failed to fetch report data')
@@ -147,8 +200,12 @@ export default function Reports() {
       const pageWidth = doc.internal.pageSize.getWidth()
       let yPos = 20
       
-      // Colors
-      const primaryColor: [number, number, number] = [30, 64, 175] // Blue
+      // Colors based on POS
+      const primaryColor: [number, number, number] = 
+        currentPOS === 'oasis' ? [59, 130, 246] :  // Blue
+        currentPOS === 'r5' ? [16, 185, 129] :      // Emerald
+        [249, 115, 22]                               // Orange (MyDiner)
+      
       const textColor: [number, number, number] = [30, 41, 59]
       const mutedColor: [number, number, number] = [100, 116, 139]
       
@@ -157,12 +214,16 @@ export default function Reports() {
       doc.setTextColor(...primaryColor)
       doc.text('Lap IT Solutions ERP System', pageWidth / 2, yPos, { align: 'center' })
       
-      yPos += 10
-      doc.setFontSize(16)
+      yPos += 8
+      doc.setFontSize(14)
       doc.setTextColor(...textColor)
-      doc.text(selectedReport?.label || 'Business Report', pageWidth / 2, yPos, { align: 'center' })
+      doc.text(posConfig.fullName, pageWidth / 2, yPos, { align: 'center' })
       
       yPos += 8
+      doc.setFontSize(16)
+      doc.text(selectedReport?.label || 'Business Report', pageWidth / 2, yPos, { align: 'center' })
+      
+      yPos += 6
       doc.setFontSize(10)
       doc.setTextColor(...mutedColor)
       doc.text(`Generated on ${reportDate}`, pageWidth / 2, yPos, { align: 'center' })
@@ -174,216 +235,30 @@ export default function Reports() {
       doc.line(20, yPos, pageWidth - 20, yPos)
       yPos += 15
       
-      // Helper function for section titles
-      const addSectionTitle = (title: string) => {
-        if (yPos > 260) {
-          doc.addPage()
-          yPos = 20
+      // Add report content
+      doc.setFontSize(12)
+      doc.setTextColor(...textColor)
+      doc.text(`Report for ${posConfig.fullName} - ${selectedReport?.label}`, 20, yPos)
+      yPos += 10
+      doc.text('Full report content will be available soon.', 20, yPos)
+      yPos += 8
+
+      // If report data includes `stats`, render a simple key/value table using autoTable
+      const stats = (reportData as Record<string, unknown>)?.stats as Record<string, unknown> | undefined
+      if (stats) {
+        const rows = Object.entries(stats).map(([k, v]) => [k, String(v)])
+        try {
+          autoTable(doc as JsPDF, {
+            startY: yPos,
+            head: [['Metric', 'Value']],
+            body: rows,
+            theme: 'grid',
+          })
+          yPos += 8
+        } catch (err) {
+          // fall back silently if autoTable fails
+          console.warn('autoTable render failed:', err)
         }
-        doc.setFontSize(14)
-        doc.setTextColor(...primaryColor)
-        doc.text(title, 20, yPos)
-        yPos += 10
-      }
-      
-      // Helper function to add stat boxes
-      const addStatBox = (label: string, value: string, subValue?: string, x?: number, width?: number) => {
-        const boxX = x ?? 20
-        const boxWidth = width ?? 40
-        
-        doc.setFillColor(248, 250, 252)
-        doc.roundedRect(boxX, yPos, boxWidth, subValue ? 22 : 18, 2, 2, 'F')
-        
-        doc.setFontSize(8)
-        doc.setTextColor(...mutedColor)
-        doc.text(label.toUpperCase(), boxX + 3, yPos + 5)
-        
-        doc.setFontSize(14)
-        doc.setTextColor(...textColor)
-        doc.text(value, boxX + 3, yPos + 13)
-        
-        if (subValue) {
-          doc.setFontSize(8)
-          doc.setTextColor(59, 130, 246)
-          doc.text(subValue, boxX + 3, yPos + 19)
-        }
-      }
-      
-      // Sales Performance Section
-      if (reportType === 'executive' || reportType === 'sales') {
-        addSectionTitle('Sales Performance')
-        
-        const boxWidth = (pageWidth - 50) / 4
-        addStatBox('Total Sales', reportData.sales.total.count.toLocaleString(), formatCurrency(reportData.sales.total.amount), 20, boxWidth)
-        addStatBox("Today's Sales", reportData.sales.today.count.toLocaleString(), formatCurrency(reportData.sales.today.amount), 20 + boxWidth + 3, boxWidth)
-        addStatBox('This Week', reportData.sales.thisWeek.count.toLocaleString(), formatCurrency(reportData.sales.thisWeek.amount), 20 + (boxWidth + 3) * 2, boxWidth)
-        addStatBox('This Month', reportData.sales.thisMonth.count.toLocaleString(), formatCurrency(reportData.sales.thisMonth.amount), 20 + (boxWidth + 3) * 3, boxWidth)
-        
-        yPos += 30
-      }
-      
-      // Top Products Table
-      if ((reportType === 'executive' || reportType === 'sales') && reportData.topProducts.length > 0) {
-        addSectionTitle('Top Selling Products')
-        
-        const tableData = reportData.topProducts.slice(0, 10).map((p, i) => [
-          (i + 1).toString(),
-          p.ItemCode,
-          p.productName?.substring(0, 30) || 'N/A',
-          Number(p.totalQty).toLocaleString(),
-          formatCurrency(Number(p.totalAmount)),
-          Number(p.transactionCount).toLocaleString()
-        ])
-        
-        autoTable(doc, {
-          startY: yPos,
-          head: [['#', 'Code', 'Product Name', 'Qty Sold', 'Revenue', 'Transactions']],
-          body: tableData,
-          theme: 'striped',
-          headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 9 },
-          bodyStyles: { fontSize: 8 },
-          columnStyles: {
-            0: { cellWidth: 10 },
-            1: { cellWidth: 25 },
-            2: { cellWidth: 60 },
-            3: { halign: 'right', cellWidth: 25 },
-            4: { halign: 'right', cellWidth: 30 },
-            5: { halign: 'center', cellWidth: 25 }
-          },
-          margin: { left: 20, right: 20 }
-        })
-        
-        yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15
-      }
-      
-      // Sales by Payment Type
-      if ((reportType === 'executive' || reportType === 'sales') && reportData.salesByPayment.length > 0) {
-        addSectionTitle('Sales by Payment Type')
-        
-        const paymentData = reportData.salesByPayment.map(p => [
-          p.PaymentType || 'Unknown',
-          Number(p.count).toLocaleString(),
-          formatCurrency(Number(p.total))
-        ])
-        
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Payment Type', 'Transactions', 'Total Amount']],
-          body: paymentData,
-          theme: 'striped',
-          headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 9 },
-          bodyStyles: { fontSize: 8 },
-          columnStyles: {
-            0: { cellWidth: 60 },
-            1: { halign: 'right', cellWidth: 40 },
-            2: { halign: 'right', cellWidth: 50 }
-          },
-          margin: { left: 20, right: 20 }
-        })
-        
-        yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15
-      }
-      
-      // Master Data Summary
-      if (reportType === 'executive' || reportType === 'inventory') {
-        if (yPos > 240) {
-          doc.addPage()
-          yPos = 20
-        }
-        
-        addSectionTitle('Master Data Summary')
-        
-        const boxWidth = (pageWidth - 50) / 4
-        addStatBox('Total Products', reportData.masterData.products.toLocaleString(), undefined, 20, boxWidth)
-        addStatBox('Suppliers', reportData.masterData.suppliers.toLocaleString(), undefined, 20 + boxWidth + 3, boxWidth)
-        addStatBox('Customers', reportData.masterData.customers.toLocaleString(), undefined, 20 + (boxWidth + 3) * 2, boxWidth)
-        addStatBox('Categories', reportData.masterData.classes.toLocaleString(), undefined, 20 + (boxWidth + 3) * 3, boxWidth)
-        
-        yPos += 25
-      }
-      
-      // Inventory by Category
-      if ((reportType === 'executive' || reportType === 'inventory') && reportData.inventoryByClass.length > 0) {
-        addSectionTitle('Inventory by Category')
-        
-        const categoryData = reportData.inventoryByClass.map(c => [
-          c.className || 'Uncategorized',
-          Number(c.productCount).toLocaleString()
-        ])
-        
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Category', 'Product Count']],
-          body: categoryData,
-          theme: 'striped',
-          headStyles: { fillColor: [30, 64, 175], textColor: 255, fontSize: 9 },
-          bodyStyles: { fontSize: 8 },
-          columnStyles: {
-            0: { cellWidth: 100 },
-            1: { halign: 'right', cellWidth: 50 }
-          },
-          margin: { left: 20, right: 20 }
-        })
-        
-        yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15
-      }
-      
-      // Purchase Orders Summary
-      if (reportType === 'executive' || reportType === 'purchasing') {
-        if (yPos > 240) {
-          doc.addPage()
-          yPos = 20
-        }
-        
-        addSectionTitle('Purchase Orders Summary')
-        
-        const boxWidth = (pageWidth - 46) / 3
-        addStatBox('Total POs', reportData.operations.purchaseOrders.total.toLocaleString(), formatCurrency(reportData.operations.purchaseOrders.totalValue), 20, boxWidth)
-        addStatBox('Pending POs', reportData.operations.purchaseOrders.pending.toLocaleString(), formatCurrency(reportData.operations.purchaseOrders.pendingValue), 20 + boxWidth + 3, boxWidth)
-        addStatBox('This Month', reportData.operations.purchaseOrders.thisMonth.toLocaleString(), formatCurrency(reportData.operations.purchaseOrders.thisMonthValue), 20 + (boxWidth + 3) * 2, boxWidth)
-        
-        yPos += 30
-      }
-      
-      // Receiving Summary
-      if (reportType === 'executive' || reportType === 'purchasing') {
-        addSectionTitle('Receiving Summary')
-        
-        const boxWidth = (pageWidth - 46) / 3
-        addStatBox('Total Receiving', reportData.operations.receiving.total.toLocaleString(), formatCurrency(reportData.operations.receiving.totalValue), 20, boxWidth)
-        addStatBox('This Month', reportData.operations.receiving.thisMonth.toLocaleString(), undefined, 20 + boxWidth + 3, boxWidth)
-        addStatBox('Pending', reportData.operations.receiving.pending.toLocaleString(), undefined, 20 + (boxWidth + 3) * 2, boxWidth)
-        
-        yPos += 25
-      }
-      
-      // Operations Summary
-      if (reportType === 'executive' || reportType === 'operations') {
-        if (yPos > 240) {
-          doc.addPage()
-          yPos = 20
-        }
-        
-        addSectionTitle('Operations Summary')
-        
-        const boxWidth = (pageWidth - 50) / 4
-        addStatBox('Transfer Out', reportData.operations.transfers.out.toLocaleString(), undefined, 20, boxWidth)
-        addStatBox('Transfer In', reportData.operations.transfers.in.toLocaleString(), undefined, 20 + boxWidth + 3, boxWidth)
-        addStatBox('Physical Counts', reportData.operations.physicalCount.toLocaleString(), undefined, 20 + (boxWidth + 3) * 2, boxWidth)
-        addStatBox('Item Movements', reportData.operations.itemMovements.total.toLocaleString(), `${reportData.operations.itemMovements.today} today`, 20 + (boxWidth + 3) * 3, boxWidth)
-        
-        yPos += 30
-      }
-      
-      // Adjustments (Voids & Returns)
-      if (reportType === 'executive' || reportType === 'operations') {
-        addSectionTitle('Adjustments (Voids & Returns)')
-        
-        const boxWidth = (pageWidth - 43) / 2
-        addStatBox('Voided Transactions', reportData.adjustments.voids.count.toLocaleString(), formatCurrency(reportData.adjustments.voids.amount), 20, boxWidth)
-        addStatBox('Returns', reportData.adjustments.returns.count.toLocaleString(), formatCurrency(reportData.adjustments.returns.amount), 20 + boxWidth + 3, boxWidth)
-        
-        yPos += 30
       }
       
       // Footer on all pages
@@ -407,7 +282,7 @@ export default function Reports() {
       }
       
       // Save the PDF
-      const fileName = `${selectedReport?.label.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd_HHmm')}.pdf`
+      const fileName = `${posConfig.name}_${selectedReport?.label.replace(/\s+/g, '_')}_${format(new Date(), 'yyyy-MM-dd_HHmm')}.pdf`
       doc.save(fileName)
       
     } catch (err) {
@@ -420,6 +295,25 @@ export default function Reports() {
 
   const selectedReportInfo = reportTypes.find(r => r.value === reportType)
 
+  // Show message if no POS is selected
+  if (!currentPOS) {
+    return (
+      <motion.div
+        className="p-6 space-y-6 max-w-[1400px] mx-auto"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <Alert>
+          <Store className="h-4 w-4" />
+          <AlertDescription>
+            Please select a POS system first to view reports.
+          </AlertDescription>
+        </Alert>
+      </motion.div>
+    )
+  }
+
   return (
     <motion.div
       className="p-6 space-y-6 max-w-[1400px] mx-auto"
@@ -430,10 +324,10 @@ export default function Reports() {
       {/* Header */}
       <motion.div variants={itemVariants} className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
-            Reports Center
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: posConfig?.color }}>
+            {posConfig?.fullName} - Reports Center
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-slate-600 dark:text-slate-400 mt-1">
             Generate and download comprehensive business reports
           </p>
         </div>
@@ -455,33 +349,40 @@ export default function Reports() {
           <Card className="border-0 shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
+                <FileText className="h-5 w-5" style={{ color: posConfig?.color }} />
                 Select Report Type
               </CardTitle>
               <CardDescription>Choose the type of report to generate</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {reportTypes.map((report) => (
-                <div
-                  key={report.value}
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    reportType === report.value
-                      ? 'border-primary bg-primary/5'
-                      : 'border-transparent bg-muted/50 hover:bg-muted'
-                  }`}
-                  onClick={() => setReportType(report.value)}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${reportType === report.value ? 'bg-primary text-white' : 'bg-background'}`}>
-                      <report.icon className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{report.label}</p>
-                      <p className="text-xs text-muted-foreground">{report.description}</p>
+              {reportTypes.map((report) => {
+                const Icon = report.icon
+                return (
+                  <div
+                    key={report.value}
+                    className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      reportType === report.value
+                        ? 'border-primary bg-primary/5'
+                        : 'border-transparent bg-muted/50 hover:bg-muted'
+                    }`}
+                    style={reportType === report.value ? { borderColor: posConfig?.color, backgroundColor: `${posConfig?.color}10` } : {}}
+                    onClick={() => setReportType(report.value)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className={`p-2 rounded-lg ${reportType === report.value ? 'text-white' : 'bg-background'}`}
+                        style={reportType === report.value ? { backgroundColor: posConfig?.color } : {}}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-800 dark:text-slate-200">{report.label}</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-400">{report.description}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
 
               <Separator className="my-4" />
 
@@ -490,6 +391,7 @@ export default function Reports() {
                 size="lg"
                 onClick={generatePDF}
                 disabled={generating || loading}
+                style={{ backgroundColor: posConfig?.color, color: 'white' }}
               >
                 {generating ? (
                   <>
@@ -521,14 +423,17 @@ export default function Reports() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    {selectedReportInfo && <selectedReportInfo.icon className="h-5 w-5 text-primary" />}
-                    {selectedReportInfo?.label} Preview
+                    {selectedReportInfo && (() => {
+                      const SelectedIcon = selectedReportInfo.icon
+                      return <SelectedIcon className="h-5 w-5" style={{ color: posConfig?.color }} />
+                    })()}
+                    <span className="text-slate-800 dark:text-slate-200">{selectedReportInfo?.label} Preview</span>
                   </CardTitle>
                   <CardDescription>
-                    {data ? 'Live data preview' : 'Click "Refresh Data" to load report data'}
+                    {data ? 'Live data preview - Click "Generate & Download PDF" to create the full report' : 'Click "Refresh Data" to load report data'}
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="gap-1">
+                <Badge variant="outline" className="gap-1" style={{ borderColor: posConfig?.color, color: posConfig?.color }}>
                   <Calendar className="h-3 w-3" />
                   {format(new Date(), 'MMM d, yyyy')}
                 </Badge>
@@ -538,206 +443,29 @@ export default function Reports() {
               <ScrollArea className="h-[600px] pr-4">
                 {loading ? (
                   <div className="flex items-center justify-center h-64">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <Loader2 className="h-8 w-8 animate-spin" style={{ color: posConfig?.color }} />
                   </div>
                 ) : data ? (
                   <div className="space-y-6">
-                    {/* Sales Summary */}
-                    {(reportType === 'executive' || reportType === 'sales') && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                          <DollarSign className="h-4 w-4" />
-                          SALES PERFORMANCE
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30">
-                            <p className="text-xs text-muted-foreground">Total Sales</p>
-                            <p className="text-xl font-bold">{data.sales.total.count.toLocaleString()}</p>
-                            <p className="text-xs text-blue-600">{formatCurrency(data.sales.total.amount)}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
-                            <p className="text-xs text-muted-foreground">Today</p>
-                            <p className="text-xl font-bold">{data.sales.today.count.toLocaleString()}</p>
-                            <p className="text-xs text-emerald-600">{formatCurrency(data.sales.today.amount)}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-950/30">
-                            <p className="text-xs text-muted-foreground">This Week</p>
-                            <p className="text-xl font-bold">{data.sales.thisWeek.count.toLocaleString()}</p>
-                            <p className="text-xs text-violet-600">{formatCurrency(data.sales.thisWeek.amount)}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30">
-                            <p className="text-xs text-muted-foreground">This Month</p>
-                            <p className="text-xl font-bold">{data.sales.thisMonth.count.toLocaleString()}</p>
-                            <p className="text-xs text-amber-600">{formatCurrency(data.sales.thisMonth.amount)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Master Data */}
-                    {(reportType === 'executive' || reportType === 'inventory') && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                          <Package className="h-4 w-4" />
-                          MASTER DATA
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Products</p>
-                            <p className="text-xl font-bold">{data.masterData.products.toLocaleString()}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Suppliers</p>
-                            <p className="text-xl font-bold">{data.masterData.suppliers.toLocaleString()}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Customers</p>
-                            <p className="text-xl font-bold">{data.masterData.customers.toLocaleString()}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Categories</p>
-                            <p className="text-xl font-bold">{data.masterData.classes.toLocaleString()}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Purchase Orders */}
-                    {(reportType === 'executive' || reportType === 'purchasing') && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                          <ShoppingCart className="h-4 w-4" />
-                          PURCHASE ORDERS
-                        </h3>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30">
-                            <p className="text-xs text-muted-foreground">Total POs</p>
-                            <p className="text-xl font-bold">{data.operations.purchaseOrders.total.toLocaleString()}</p>
-                            <p className="text-xs text-blue-600">{formatCurrency(data.operations.purchaseOrders.totalValue)}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30">
-                            <p className="text-xs text-muted-foreground">Pending</p>
-                            <p className="text-xl font-bold text-amber-600">{data.operations.purchaseOrders.pending.toLocaleString()}</p>
-                            <p className="text-xs text-amber-600">{formatCurrency(data.operations.purchaseOrders.pendingValue)}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
-                            <p className="text-xs text-muted-foreground">This Month</p>
-                            <p className="text-xl font-bold">{data.operations.purchaseOrders.thisMonth.toLocaleString()}</p>
-                            <p className="text-xs text-emerald-600">{formatCurrency(data.operations.purchaseOrders.thisMonthValue)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Receiving */}
-                    {(reportType === 'executive' || reportType === 'purchasing') && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                          <Truck className="h-4 w-4" />
-                          RECEIVING
-                        </h3>
-                        <div className="grid grid-cols-3 gap-3">
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Total</p>
-                            <p className="text-xl font-bold">{data.operations.receiving.total.toLocaleString()}</p>
-                            <p className="text-xs text-muted-foreground">{formatCurrency(data.operations.receiving.totalValue)}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">This Month</p>
-                            <p className="text-xl font-bold">{data.operations.receiving.thisMonth.toLocaleString()}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Pending</p>
-                            <p className="text-xl font-bold text-amber-600">{data.operations.receiving.pending.toLocaleString()}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Operations */}
-                    {(reportType === 'executive' || reportType === 'operations') && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                          <TrendingUp className="h-4 w-4" />
-                          OPERATIONS
-                        </h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Transfer Out</p>
-                            <p className="text-xl font-bold">{data.operations.transfers.out.toLocaleString()}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Transfer In</p>
-                            <p className="text-xl font-bold">{data.operations.transfers.in.toLocaleString()}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Physical Counts</p>
-                            <p className="text-xl font-bold">{data.operations.physicalCount.toLocaleString()}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-muted/50">
-                            <p className="text-xs text-muted-foreground">Item Movements</p>
-                            <p className="text-xl font-bold">{data.operations.itemMovements.total.toLocaleString()}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Adjustments */}
-                    {(reportType === 'executive' || reportType === 'operations') && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                          <AlertTriangle className="h-4 w-4" />
-                          ADJUSTMENTS
-                        </h3>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30">
-                            <p className="text-xs text-muted-foreground">Voids</p>
-                            <p className="text-xl font-bold text-red-600">{data.adjustments.voids.count.toLocaleString()}</p>
-                            <p className="text-xs text-red-600">{formatCurrency(data.adjustments.voids.amount)}</p>
-                          </div>
-                          <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30">
-                            <p className="text-xs text-muted-foreground">Returns</p>
-                            <p className="text-xl font-bold text-amber-600">{data.adjustments.returns.count.toLocaleString()}</p>
-                            <p className="text-xs text-amber-600">{formatCurrency(data.adjustments.returns.amount)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Top Products */}
-                    {(reportType === 'executive' || reportType === 'sales') && data.topProducts.length > 0 && (
-                      <div>
-                        <h3 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
-                          <BarChart3 className="h-4 w-4" />
-                          TOP SELLING PRODUCTS
-                        </h3>
-                        <div className="space-y-2">
-                          {data.topProducts.slice(0, 5).map((product, index) => (
-                            <div key={product.ItemCode} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                                index === 0 ? 'bg-amber-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-amber-700' : 'bg-gray-300'
-                              }`}>
-                                {index + 1}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">{product.productName}</p>
-                                <p className="text-xs text-muted-foreground">{product.ItemCode}</p>
-                              </div>
-                              <div className="text-right">
-                                <p className="font-semibold text-sm">{formatCurrency(Number(product.totalAmount))}</p>
-                                <p className="text-xs text-muted-foreground">{Number(product.totalQty).toLocaleString()} sold</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: `${posConfig?.color}15` }}>
+                      <p className="font-medium text-slate-800 dark:text-slate-200">
+                        ✅ {posConfig?.fullName} Report Data Loaded
+                      </p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        {currentPOS === 'r5' && `${reportTypes.length} R5 retail-focused reports available`}
+                        {currentPOS === 'oasis' && `${reportTypes.length} OASIS reports available`}
+                        {currentPOS === 'mydiner' && `${reportTypes.length} MyDiner restaurant reports available`}
+                      </p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+                        Click "Generate & Download PDF" to create the full report with detailed data.
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                     <FileText className="h-12 w-12 opacity-50 mb-4" />
-                    <p>No data loaded</p>
-                    <Button variant="link" onClick={fetchReportData}>
+                    <p className="text-slate-600 dark:text-slate-400">No data loaded</p>
+                    <Button variant="link" onClick={fetchReportData} style={{ color: posConfig?.color }}>
                       Load Report Data
                     </Button>
                   </div>
