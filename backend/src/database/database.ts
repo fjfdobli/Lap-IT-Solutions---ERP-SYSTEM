@@ -6,7 +6,7 @@ dotenv.config()
 export const erpPool = mysql.createPool({
   host: process.env.ERP_DB_HOST || 'localhost',
   port: Number(process.env.ERP_DB_PORT || 3306),
-  user: process.env.ERP_DB_USER || 'root',  
+  user: process.env.ERP_DB_USER || 'ibs',  
   password: process.env.ERP_DB_PASSWORD || 'worldwide',
   database: process.env.ERP_DB_NAME || 'erp_database',
   waitForConnections: true,
@@ -17,7 +17,7 @@ export const erpPool = mysql.createPool({
 export const posPool = mysql.createPool({
   host: process.env.POS_DB_HOST || 'localhost',
   port: Number(process.env.POS_DB_PORT || 3306),
-  user: process.env.POS_DB_USER || 'root',
+  user: process.env.POS_DB_USER || 'ibs',
   password: process.env.POS_DB_PASSWORD || 'worldwide',
   database: process.env.POS_DB_NAME || 'ibs_pos_new',
   waitForConnections: true,
