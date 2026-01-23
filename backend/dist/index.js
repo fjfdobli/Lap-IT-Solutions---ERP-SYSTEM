@@ -26,6 +26,7 @@ const pos_data_1 = __importDefault(require("./routes/pos-data"));
 const pos_tables_1 = __importDefault(require("./routes/pos-tables"));
 const db_explorer_1 = __importDefault(require("./routes/db-explorer"));
 const multi_pos_1 = __importDefault(require("./routes/multi-pos"));
+const oasis_reports_1 = __importDefault(require("./routes/oasis-reports"));
 const r5_reports_1 = __importDefault(require("./routes/r5-reports"));
 const mydiner_reports_1 = __importDefault(require("./routes/mydiner-reports"));
 const pos_monitor_1 = require("./services/pos-monitor");
@@ -79,6 +80,7 @@ app.use('/api/pos-data', pos_data_1.default);
 app.use('/api/pos-tables', pos_tables_1.default);
 app.use('/api/db-explorer', db_explorer_1.default);
 app.use('/api/multi-pos', multi_pos_1.default);
+app.use('/api/oasis-reports', oasis_reports_1.default);
 app.use('/api/r5-reports', r5_reports_1.default);
 app.use('/api/mydiner-reports', mydiner_reports_1.default);
 app.get('/db-status', async (_req, res) => {
@@ -91,23 +93,11 @@ const server = app.listen(config_1.config.port, () => {
 });
 (async () => {
     try {
-        const results = await (0, database_1.testConnections)();
-        let allConnected = true;
-        results.forEach(r => {
-            if (r.ok) {
-                console.log(`Database connected successfully: ${r.which}`);
-            }
-            else {
-                console.error(`Database connection failed: ${r.which} — ${r.info ?? 'unknown error'}`);
-                allConnected = false;
-            }
-        });
-        if (allConnected) {
-            (0, pos_monitor_1.startPOSMonitor)(15000);
-        }
+        console.log('Starting server without database connection tests or POS monitor...');
+        // startPOSMonitor(15000) // Disabled for now
     }
     catch (err) {
-        console.error('Error testing DB connections on startup', err);
+        console.error('Error starting server', err);
     }
 })();
 async function shutdown() {

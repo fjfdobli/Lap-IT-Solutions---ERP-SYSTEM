@@ -21,6 +21,7 @@ import posDataRoutes from './routes/pos-data'
 import posTablesRoutes from './routes/pos-tables'
 import dbExplorerRoutes from './routes/db-explorer'
 import multiPosRoutes from './routes/multi-pos'
+import oasisReportsRoutes from './routes/oasis-reports'
 import r5ReportsRoutes from './routes/r5-reports'
 import mydinerReportsRoutes from './routes/mydiner-reports'
 import { startPOSMonitor, stopPOSMonitor } from './services/pos-monitor'
@@ -78,6 +79,7 @@ app.use('/api/pos-data', posDataRoutes)
 app.use('/api/pos-tables', posTablesRoutes)
 app.use('/api/db-explorer', dbExplorerRoutes)
 app.use('/api/multi-pos', multiPosRoutes)
+app.use('/api/oasis-reports', oasisReportsRoutes)
 app.use('/api/r5-reports', r5ReportsRoutes)
 app.use('/api/mydiner-reports', mydinerReportsRoutes)
 
@@ -89,26 +91,27 @@ app.get('/db-status', async (_req: Request, res: Response) => {
 const server = app.listen(config.port, () => {
   console.log(`Server running at: http://localhost:${config.port}`)
   console.log(`API endpoints available at: http://localhost:${config.port}/api\n`)
+  console.log('Server started successfully!')
 })
 
 ;(async () => {
   try {
-    const results = await testConnections()
-    let allConnected = true
-    results.forEach(r => {
-      if (r.ok) {
-        console.log(`Database connected successfully: ${r.which}`)
-      } else {
-        console.error(`Database connection failed: ${r.which} — ${r.info ?? 'unknown error'}`)
-        allConnected = false
-      }
+    console.log('Testing database connections...')
+    const dbResults = await testConnections()
+    console.log('Database connection test results:')
+    dbResults.forEach(result => {
+      console.log(`  ${result.which}: ${result.ok ? 'OK' : 'FAILED'}${result.info ? ` - ${result.info}` : ''}`)
     })
     
-    if (allConnected) {
-      startPOSMonitor(15000) 
+    const failedConnections = dbResults.filter(r => !r.ok)
+    if (failedConnections.length > 0) {
+      console.log('Some database connections failed. Server will continue but some features may not work.')
     }
+    
+    // startPOSMonitor(15000) // Disabled for now
+    console.log('Server initialization complete.')
   } catch (err) {
-    console.error('Error testing DB connections on startup', err)
+    console.error('Error starting server', err)
   }
 })()
 
@@ -126,5 +129,12 @@ async function shutdown() {
   })
 }
 
-process.on('SIGINT', shutdown)
-process.on('SIGTERM', shutdown)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+  // Don't exit the process
+})
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error)
+  // Don't exit the process
+})

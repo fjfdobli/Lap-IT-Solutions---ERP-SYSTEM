@@ -3,15 +3,14 @@ import { api } from '@/lib/api'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   FileText,
   Download,
   Loader2,
   RefreshCw,
-  Calendar,
   ShoppingCart,
   Package,
   DollarSign,
@@ -23,11 +22,12 @@ import {
   Store,
 } from 'lucide-react'
 import { format } from 'date-fns'
+import { usePOS } from '../lib/pos-context'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { cn } from '@/lib/utils'
 import jsPDF from 'jspdf'
 import type { jsPDF as JsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { usePOS } from '../lib/pos-context'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -74,9 +74,22 @@ const mydinerReportTypes = [
 
 
 type ReportData = {
+  items?: any[]
+  totals?: {
+    total_sales?: number
+    total_transactions?: number
+    total_items?: number
+    average_sale?: number
+    netOfVat?: number
+    vat?: number
+    grossSales?: number
+  }
   stats?: Record<string, unknown>
   [key: string]: unknown
 }
+
+// Date filter presets
+type DatePreset = 'specific' | 'monthly' | 'yearly'
 
 export default function Reports() {
   const { currentPOS, posConfig } = usePOS()
@@ -85,6 +98,14 @@ export default function Reports() {
   const [data, setData] = useState<ReportData | null>(null)
   const [reportType, setReportType] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  // Date filter state
+  const [datePreset, setDatePreset] = useState<DatePreset>('specific')
+  const [specificDate, setSpecificDate] = useState<Date>(new Date())
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth())
+  const [selectedYear, setSelectedYear] = useState<number>(2026)
+  const [yearlyStartYear, setYearlyStartYear] = useState<number>(2020)
+  const [yearlyEndYear, setYearlyEndYear] = useState<number>(2026)
 
   // Get report types based on current POS
   const getReportTypes = () => {
@@ -112,9 +133,66 @@ export default function Reports() {
       }
     }, [reportTypes])
 
-  // Get API endpoint based on current POS
-  const getApiEndpoint = useCallback((): string | null => {
+  // Calculate date range based on preset
+  const getDateRange = useCallback((): { from: string | null; to: string | null } => {
+    switch (datePreset) {
+      case 'specific':
+        return {
+          from: format(specificDate, 'yyyy-MM-dd'),
+          to: format(specificDate, 'yyyy-MM-dd')
+        }
+      case 'monthly':
+        const monthStart = new Date(selectedYear, selectedMonth, 1)
+        const monthEnd = new Date(selectedYear, selectedMonth + 1, 0)
+        return {
+          from: format(monthStart, 'yyyy-MM-dd'),
+          to: format(monthEnd, 'yyyy-MM-dd')
+        }
+      case 'yearly':
+        const yearStart = new Date(yearlyStartYear, 0, 1)
+        const yearEnd = new Date(yearlyEndYear, 11, 31)
+        return {
+          from: format(yearStart, 'yyyy-MM-dd'),
+          to: format(yearEnd, 'yyyy-MM-dd')
+        }
+      default:
+        return { from: null, to: null }
+    }
+  }, [datePreset, specificDate, selectedMonth, selectedYear, yearlyStartYear, yearlyEndYear])
+
+  // Determine report type based on date range
+  const getReportType = useCallback((): 'single' | 'range' | 'yearly' => {
+    switch (datePreset) {
+      case 'specific':
+        return 'single'
+      case 'monthly':
+        return 'range'
+      case 'yearly':
+        return 'yearly'
+      default:
+        return 'single'
+    }
+  }, [datePreset])
+
+  // Get API endpoint based on current POS and report type
+  const getApiEndpoint = useCallback((reportType: string = ''): string | null => {
     if (!currentPOS) return null
+
+    // For sales reports, use specific endpoints
+    if (reportType === 'sales') {
+      switch (currentPOS) {
+        case 'oasis':
+          return '/oasis-reports/sales'
+        case 'r5':
+          return '/r5-reports/sales'
+        case 'mydiner':
+          return '/mydiner-reports/sales' // Will be implemented later
+        default:
+          return null
+      }
+    }
+
+    // For other reports, use existing endpoints
     switch (currentPOS) {
       case 'oasis':
         return '/dashboard/stats'
@@ -128,7 +206,7 @@ export default function Reports() {
   }, [currentPOS])
 
   const fetchReportData = useCallback(async () => {
-    const endpoint = getApiEndpoint()
+    const endpoint = getApiEndpoint('sales')
     if (!endpoint) {
       setError('No API endpoint configured for this POS')
       return
@@ -136,8 +214,18 @@ export default function Reports() {
 
     setLoading(true)
     setError(null)
+
+    // Get date range parameters
+    const dateRange = getDateRange()
+    const params = new URLSearchParams()
+
+    if (dateRange.from) params.append('from', dateRange.from)
+    if (dateRange.to) params.append('to', dateRange.to)
+
+    const url = params.toString() ? `${endpoint}?${params.toString()}` : endpoint
+
     try {
-      const response = await api.get<ReportData>(endpoint)
+      const response = await api.get<ReportData>(url)
       if (response.success && response.data) {
         setData(response.data ?? null)
       } else {
@@ -149,7 +237,7 @@ export default function Reports() {
     } finally {
       setLoading(false)
     }
-  }, [getApiEndpoint])
+  }, [getApiEndpoint, getDateRange])
 
   const generatePDF = async () => {
     if (!currentPOS || !posConfig) {
@@ -161,14 +249,23 @@ export default function Reports() {
     if (!reportData) {
       setLoading(true)
       try {
-        const endpoint = getApiEndpoint()
+        const endpoint = getApiEndpoint('sales')
         if (!endpoint) {
           setError('No API endpoint configured for this POS')
           setLoading(false)
           return
         }
 
-        const response = await api.get<ReportData>(endpoint)
+        // Get date range parameters
+        const dateRange = getDateRange()
+        const params = new URLSearchParams()
+
+        if (dateRange.from) params.append('from', dateRange.from)
+        if (dateRange.to) params.append('to', dateRange.to)
+
+        const url = params.toString() ? `${endpoint}?${params.toString()}` : endpoint
+
+        const response = await api.get<ReportData>(url)
         if (response.success && response.data) {
           reportData = response.data ?? reportData
           setData(reportData)
@@ -235,28 +332,115 @@ export default function Reports() {
       doc.line(20, yPos, pageWidth - 20, yPos)
       yPos += 15
       
-      // Add report content
+      // Add report content based on report type
+      const reportType = getReportType()
       doc.setFontSize(12)
       doc.setTextColor(...textColor)
-      doc.text(`Report for ${posConfig.fullName} - ${selectedReport?.label}`, 20, yPos)
-      yPos += 10
-      doc.text('Full report content will be available soon.', 20, yPos)
-      yPos += 8
 
-      // If report data includes `stats`, render a simple key/value table using autoTable
-      const stats = (reportData as Record<string, unknown>)?.stats as Record<string, unknown> | undefined
-      if (stats) {
-        const rows = Object.entries(stats).map(([k, v]) => [k, String(v)])
+      if (reportType === 'single' && reportData.items && reportData.items.length > 0) {
+        // Single date - detailed transactions
+        doc.text('Transaction Details', 20, yPos)
+        yPos += 10
+
+        const tableData = reportData.items.map((item: any) => [
+          item.receipt_no || item.receipt || '',
+          item.date ? format(new Date(item.date), 'MMM d, yyyy') : '',
+          item.item || item.product || '',
+          item.customer || 'N/A',
+          item.qty || item.quantity || 0,
+          `$${(item.price || 0).toFixed(2)}`,
+          `$${(item.total || 0).toFixed(2)}`
+        ])
+
+        try {
+          autoTable(doc as JsPDF, {
+            startY: yPos,
+            head: [['Receipt No.', 'Date', 'Item', 'Customer', 'Qty', 'Price', 'Total']],
+            body: tableData,
+            theme: 'grid',
+            styles: { fontSize: 8 },
+            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] },
+          })
+        } catch (err) {
+          console.warn('autoTable render failed:', err)
+        }
+      } else if (reportType === 'range' && reportData.items && reportData.items.length > 0) {
+        // Date range - daily totals
+        doc.text('Daily Sales Summary', 20, yPos)
+        yPos += 10
+
+        const tableData = reportData.items.map((item: any) => [
+          item.date ? format(new Date(item.date), 'MMM d, yyyy') : '',
+          `$${(item.total || item.amount || 0).toFixed(2)}`
+        ])
+
+        try {
+          autoTable(doc as JsPDF, {
+            startY: yPos,
+            head: [['Date', 'Total Sales']],
+            body: tableData,
+            theme: 'grid',
+            styles: { fontSize: 10 },
+            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] },
+          })
+        } catch (err) {
+          console.warn('autoTable render failed:', err)
+        }
+      } else if (reportType === 'yearly' && reportData.items && reportData.items.length > 0) {
+        // Yearly - monthly totals
+        doc.text('Monthly Sales Summary', 20, yPos)
+        yPos += 10
+
+        const tableData = reportData.items.map((item: any) => [
+          item.month || item.period || '',
+          `$${(item.total || item.amount || 0).toFixed(2)}`
+        ])
+
+        try {
+          autoTable(doc as JsPDF, {
+            startY: yPos,
+            head: [['Month', 'Total Sales']],
+            body: tableData,
+            theme: 'grid',
+            styles: { fontSize: 10 },
+            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] },
+          })
+        } catch (err) {
+          console.warn('autoTable render failed:', err)
+        }
+      }
+
+      // Add totals section if available
+      if (reportData.totals) {
+        yPos += 20
+        doc.setFontSize(14)
+        doc.setTextColor(...primaryColor)
+        doc.text('Report Totals', 20, yPos)
+        yPos += 10
+
+        doc.setFontSize(10)
+        doc.setTextColor(...textColor)
+        const totalsData = reportData.reportType === 'Daily Sales Report' ? [
+          ['Net of VAT', `$${reportData.totals.netOfVat?.toFixed(2) || '0.00'}`],
+          ['VAT (12%)', `$${reportData.totals.vat?.toFixed(2) || '0.00'}`],
+          ['Gross Sales', `$${reportData.totals.grossSales?.toFixed(2) || '0.00'}`]
+        ] : [
+          ['Total Sales', `$${reportData.totals.total_sales?.toFixed(2) || '0.00'}`],
+          ['Total Transactions', String(reportData.totals.total_transactions || 0)],
+          ['Total Items Sold', String(reportData.totals.total_items || 0)],
+          ['Average Sale', `$${reportData.totals.average_sale?.toFixed(2) || '0.00'}`]
+        ]
+
         try {
           autoTable(doc as JsPDF, {
             startY: yPos,
             head: [['Metric', 'Value']],
-            body: rows,
+            body: totalsData,
             theme: 'grid',
+            styles: { fontSize: 9 },
+            headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] },
           })
-          yPos += 8
         } catch (err) {
-          // fall back silently if autoTable fails
           console.warn('autoTable render failed:', err)
         }
       }
@@ -433,11 +617,140 @@ export default function Reports() {
                     {data ? 'Live data preview - Click "Generate & Download PDF" to create the full report' : 'Click "Refresh Data" to load report data'}
                   </CardDescription>
                 </div>
-                <Badge variant="outline" className="gap-1" style={{ borderColor: posConfig?.color, color: posConfig?.color }}>
-                  <Calendar className="h-3 w-3" />
-                  {format(new Date(), 'MMM d, yyyy')}
-                </Badge>
               </div>
+
+              {/* New Period Filter Section */}
+              <div className="space-y-4 mt-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Period:</span>
+
+                  {/* Period type buttons */}
+                  {[
+                    { key: 'specific', label: 'Specific Date' },
+                    { key: 'monthly', label: 'Monthly' },
+                    { key: 'yearly', label: 'Yearly' }
+                  ].map(({ key, label }) => (
+                    <Button
+                      key={key}
+                      variant={datePreset === key ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setDatePreset(key as DatePreset)
+                        setLoading(true)
+                        fetchReportData()
+                      }}
+                      style={datePreset === key ? { backgroundColor: posConfig?.color, borderColor: posConfig?.color } : {}}
+                      className={cn(
+                        "text-xs",
+                        datePreset === key && "text-white hover:opacity-90"
+                      )}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+
+                {/* Period-specific controls */}
+                <div className="flex items-center gap-4 flex-wrap">
+                  {datePreset === 'specific' && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-medium text-slate-700">Date:</label>
+                      <input
+                        type="date"
+                        value={format(specificDate, 'yyyy-MM-dd')}
+                        onChange={(e) => {
+                          const date = new Date(e.target.value)
+                          setSpecificDate(date)
+                          setLoading(true)
+                          fetchReportData()
+                        }}
+                        max={format(new Date(), 'yyyy-MM-dd')}
+                        className="px-3 py-1 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  )}
+
+                  {datePreset === 'monthly' && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-medium text-slate-700">Month:</label>
+                      <select
+                        value={selectedMonth}
+                        onChange={(e) => {
+                          setSelectedMonth(parseInt(e.target.value))
+                          setLoading(true)
+                          fetchReportData()
+                        }}
+                        className="px-3 py-1 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {[
+                          'January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'
+                        ].map((month, index) => (
+                          <option key={index} value={index}>{month}</option>
+                        ))}
+                      </select>
+                      <label className="text-xs font-medium text-slate-700">Year:</label>
+                      <input
+                        type="number"
+                        value={selectedYear}
+                        onChange={(e) => {
+                          setSelectedYear(parseInt(e.target.value))
+                          setLoading(true)
+                          fetchReportData()
+                        }}
+                        min="2010"
+                        max="2030"
+                        className="w-20 px-3 py-1 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                  )}
+
+                  {datePreset === 'yearly' && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs font-medium text-slate-700">From:</label>
+                      <select
+                        value={yearlyStartYear}
+                        onChange={(e) => {
+                          setYearlyStartYear(parseInt(e.target.value))
+                          setLoading(true)
+                          fetchReportData()
+                        }}
+                        className="px-3 py-1 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {Array.from({ length: 17 }, (_, i) => 2010 + i).map(year => (
+                          <option key={year} value={year}>{year}</option>
+                        ))}
+                      </select>
+                      <label className="text-xs font-medium text-slate-700">To:</label>
+                      <select
+                        value={yearlyEndYear}
+                        onChange={(e) => {
+                          setYearlyEndYear(parseInt(e.target.value))
+                          setLoading(true)
+                          fetchReportData()
+                        }}
+                        className="px-3 py-1 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        {Array.from({ length: 17 }, (_, i) => 2010 + i).map(year => (
+                          <option key={year} value={year}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Show selected period info */}
+                <div className="text-xs text-slate-600 dark:text-slate-400">
+                  {datePreset === 'specific' && `Showing data for ${format(specificDate, 'MMM d, yyyy')}`}
+                  {datePreset === 'monthly' && `Showing data for ${[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ][selectedMonth]} ${selectedYear}`}
+                  {datePreset === 'yearly' && `Showing data from ${yearlyStartYear} to ${yearlyEndYear}`}
+                </div>
+              </div>
+
+
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[600px] pr-4">
@@ -447,19 +760,168 @@ export default function Reports() {
                   </div>
                 ) : data ? (
                   <div className="space-y-6">
+                    {/* Report Summary */}
                     <div className="p-4 rounded-lg" style={{ backgroundColor: `${posConfig?.color}15` }}>
                       <p className="font-medium text-slate-800 dark:text-slate-200">
-                        ✅ {posConfig?.fullName} Report Data Loaded
+                        ✅ {posConfig?.fullName} Sales Report Loaded
                       </p>
                       <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                        {currentPOS === 'r5' && `${reportTypes.length} R5 retail-focused reports available`}
-                        {currentPOS === 'oasis' && `${reportTypes.length} OASIS reports available`}
-                        {currentPOS === 'mydiner' && `${reportTypes.length} MyDiner restaurant reports available`}
-                      </p>
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-                        Click "Generate & Download PDF" to create the full report with detailed data.
+                        {getReportType() === 'single' && 'Detailed transaction data for selected date'}
+                        {getReportType() === 'range' && 'Daily sales summary for selected period'}
+                        {getReportType() === 'yearly' && 'Monthly sales summary for selected period'}
                       </p>
                     </div>
+
+                    {/* Report Data Table */}
+                    {getReportType() === 'single' && data.items && data.items.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Transaction Details</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Receipt No.</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Item</TableHead>
+                                <TableHead>Customer</TableHead>
+                                <TableHead className="text-right">Qty</TableHead>
+                                <TableHead className="text-right">Price</TableHead>
+                                <TableHead className="text-right">Total</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {data.items.map((item: any, index: number) => (
+                                <TableRow key={index}>
+                                  <TableCell className="font-mono">{item.receipt_no || item.receipt}</TableCell>
+                                  <TableCell>{item.date ? format(new Date(item.date), 'MMM d, yyyy') : item.date}</TableCell>
+                                  <TableCell>{item.item || item.product}</TableCell>
+                                  <TableCell>{item.customer || 'N/A'}</TableCell>
+                                  <TableCell className="text-right">{item.qty || item.quantity}</TableCell>
+                                  <TableCell className="text-right">${(item.price || 0).toFixed(2)}</TableCell>
+                                  <TableCell className="text-right font-medium">${(item.total || 0).toFixed(2)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {getReportType() === 'range' && data.items && data.items.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Daily Sales Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Total Sales</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {data.items.map((item: any, index: number) => (
+                                <TableRow key={index}>
+                                  <TableCell>{item.date ? format(new Date(item.date), 'MMM d, yyyy') : item.date}</TableCell>
+                                  <TableCell className="text-right font-medium">${(item.total || item.amount || 0).toFixed(2)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {getReportType() === 'yearly' && data.items && data.items.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Monthly Sales Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Month</TableHead>
+                                <TableHead className="text-right">Total Sales</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {data.items.map((item: any, index: number) => (
+                                <TableRow key={index}>
+                                  <TableCell>{item.month || item.period}</TableCell>
+                                  <TableCell className="text-right font-medium">${(item.total || item.amount || 0).toFixed(2)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Totals Section */}
+                    {data.totals && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-lg">Report Totals</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          {data.reportType === 'Daily Sales Report' ? (
+                            // Single date report - show Net of VAT, VAT, Gross Sales
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="text-center p-4 rounded-lg bg-muted">
+                                <p className="text-2xl font-bold" style={{ color: posConfig?.color }}>
+                                  ${data.totals.netOfVat?.toFixed(2) || '0.00'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">Net of VAT</p>
+                              </div>
+                              <div className="text-center p-4 rounded-lg bg-muted">
+                                <p className="text-2xl font-bold" style={{ color: posConfig?.color }}>
+                                  ${data.totals.vat?.toFixed(2) || '0.00'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">VAT (12%)</p>
+                              </div>
+                              <div className="text-center p-4 rounded-lg bg-muted">
+                                <p className="text-2xl font-bold" style={{ color: posConfig?.color }}>
+                                  ${data.totals.grossSales?.toFixed(2) || '0.00'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">Gross Sales</p>
+                              </div>
+                            </div>
+                          ) : (
+                            // Other reports - show standard totals
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="text-center p-4 rounded-lg bg-muted">
+                                <p className="text-2xl font-bold" style={{ color: posConfig?.color }}>
+                                  ${data.totals.total_sales?.toFixed(2) || '0.00'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">Total Sales</p>
+                              </div>
+                              <div className="text-center p-4 rounded-lg bg-muted">
+                                <p className="text-2xl font-bold" style={{ color: posConfig?.color }}>
+                                  {data.totals.total_transactions || 0}
+                                </p>
+                                <p className="text-sm text-muted-foreground">Transactions</p>
+                              </div>
+                              <div className="text-center p-4 rounded-lg bg-muted">
+                                <p className="text-2xl font-bold" style={{ color: posConfig?.color }}>
+                                  {data.totals.total_items || 0}
+                                </p>
+                                <p className="text-sm text-muted-foreground">Items Sold</p>
+                              </div>
+                              <div className="text-center p-4 rounded-lg bg-muted">
+                                <p className="text-2xl font-bold" style={{ color: posConfig?.color }}>
+                                  ${data.totals.average_sale?.toFixed(2) || '0.00'}
+                                </p>
+                                <p className="text-sm text-muted-foreground">Avg Sale</p>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">

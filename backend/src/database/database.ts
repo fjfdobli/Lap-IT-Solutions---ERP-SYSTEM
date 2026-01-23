@@ -75,6 +75,7 @@ export async function testConnections() {
     await myDineInPool.query('SELECT 1 as ok')
     results.push({ which: 'mydinein', ok: true })
   } catch (err: any) {
+    console.log(`MyDineIn database not available: ${err?.message || err}`)
     results.push({ which: 'mydinein', ok: false, info: String(err?.message || err) })
   }
 

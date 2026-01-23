@@ -452,4 +452,181 @@ router.get('/stats', authenticateToken, async (req: Request, res: Response) => {
   }
 })
 
+// =======================
+// GET SALES REPORT
+// =======================
+router.get('/sales', authenticateToken, async (req: Request, res: Response) => {
+  console.log('[R5 Reports] Fetching sales report data...')
+
+  const { from, to, reportType } = req.query
+
+  // Validate date parameters
+  if (!from || !to) {
+    return res.status(400).json({
+      success: false,
+      message: 'Date range parameters are required (from and to in YYYY-MM-DD format)',
+    })
+  }
+
+  try {
+    const fromDate = from as string
+    const toDate = to as string
+    const isSingleDate = fromDate === toDate
+
+    let data: any = {}
+
+    if (isSingleDate) {
+      // ===== SINGLE DATE REPORT =====
+      // ===== 1. ITEM DETAILS =====
+      const itemsQuery = `
+        SELECT
+          d.TRNo_D    AS receiptNo,
+          d.DateTrans AS date,
+          d.ItemName  AS itemName,
+          d.CustName  AS custName,
+          d.Qty       AS qty,
+          d.Price     AS price,
+          d.Total     AS total
+        FROM pos_trans_details d
+        WHERE DATE(d.DateTrans) = ?
+        ORDER BY d.TRNo_D;
+      `
+
+      // ===== 2. TOTALS =====
+      const totalsQuery = `
+        SELECT
+          SUM(NetSales - Tax) AS netOfVat,
+          SUM(Tax)            AS vat,
+          SUM(NetSales)       AS grossSales
+        FROM pos_trans_header
+        WHERE DATE(DateTrans) = ?;
+      `
+
+      const [items, totalsResult] = await Promise.all([
+        safeQuery(itemsQuery, [fromDate]),
+        safeQuery(totalsQuery, [fromDate], [
+          { netOfVat: 0, vat: 0, grossSales: 0 },
+        ]),
+      ])
+
+      const totals = totalsResult[0]
+
+      data = {
+        reportType: 'Daily Sales Report',
+        dateRange: { from: fromDate, to: toDate },
+        columns: ['Receipt No.', 'Date', 'Item', 'Customer', 'Qty Sold', 'Price', 'Total'],
+        items: items.map((item: any) => ({
+          receipt_no: item.receiptNo,
+          date: item.date,
+          item: item.itemName,
+          customer: item.custName || 'Walk-in',
+          qty: Number(item.qty) || 0,
+          price: Number(item.price) || 0,
+          total: Number(item.total) || 0,
+        })),
+        totals: {
+          netOfVat: Number(totals.netOfVat) || 0,
+          vat: Number(totals.vat) || 0,
+          grossSales: Number(totals.grossSales) || 0,
+        },
+      }
+    } else {
+      // ===== DATE RANGE REPORT =====
+      const dateRangeQuery = `
+        SELECT
+          DATE(d.DateTrans) AS date,
+          SUM(d.Total)      AS total
+        FROM pos_trans_details d
+        WHERE DATE(d.DateTrans) BETWEEN ? AND ?
+        GROUP BY DATE(d.DateTrans)
+        ORDER BY DATE(d.DateTrans);
+      `
+
+      const dateRangeData = await safeQuery(dateRangeQuery, [fromDate, toDate])
+
+      data = {
+        reportType: 'Sales Report',
+        dateRange: { from: fromDate, to: toDate },
+        columns: ['Date', 'Total'],
+        items: dateRangeData.map((item: any) => ({
+          date: item.date,
+          total: Number(item.total) || 0,
+        })),
+        totals: {
+          totalSales: dateRangeData.reduce((sum: number, item: any) => sum + Number(item.total || 0), 0),
+        },
+      }
+    }
+
+    res.json({
+      success: true,
+      data,
+    })
+  } catch (error: any) {
+    console.error('[R5 Reports] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch R5 sales report data',
+      details: error?.message,
+    })
+  }
+})
+
+// =======================
+// GET MONTHLY SALES REPORT
+// =======================
+router.get('/sales/monthly', authenticateToken, async (req: Request, res: Response) => {
+  console.log('[R5 Reports] Fetching monthly sales report data...')
+
+  const { year } = req.query
+
+  if (!year) {
+    return res.status(400).json({
+      success: false,
+      message: 'Year parameter is required (YYYY format)',
+    })
+  }
+
+  try {
+    const monthlyQuery = `
+      SELECT
+        YEAR(DateTrans)  AS salesYear,
+        MONTH(DateTrans) AS salesMonth,
+        DATE_FORMAT(DateTrans, '%Y-%m') AS monthLabel,
+        SUM(NetSales)  AS monthlyTotal
+      FROM pos_trans_header
+      WHERE YEAR(DateTrans) = ?
+      GROUP BY YEAR(DateTrans), MONTH(DateTrans)
+      ORDER BY YEAR(DateTrans), MONTH(DateTrans);
+    `
+
+    const monthlyData = await safeQuery(monthlyQuery, [year])
+
+    const data = {
+      reportType: 'Monthly Sales Report',
+      year,
+      columns: ['Month', 'Total'],
+      items: monthlyData.map((item: any) => ({
+        month: item.monthLabel || `Month ${item.salesMonth}`,
+        total: Number(item.monthlyTotal) || 0,
+      })),
+      totals: {
+        totalSales: monthlyData.reduce((sum: number, item: any) => sum + Number(item.monthlyTotal || 0), 0),
+      },
+    }
+
+    res.json({
+      success: true,
+      data,
+    })
+  } catch (error: any) {
+    console.error('[R5 Reports] Error:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch R5 monthly sales report data',
+      details: error?.message,
+    })
+  }
+})
+
 export default router
